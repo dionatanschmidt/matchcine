@@ -24,7 +24,7 @@ export default function WelcomeScreen({ onStart, onSkip }: Props) {
         momento — e só do que você já assina.
       </p>
       <div className="how">
-        <b>como você está</b> <i>→</i> <b>com quem</b> <i>→</i> seu filme 🍿
+        <b>como chego</b> <i>→</i> <b>com quem estou</b> <i>→</i> meu filme 🍿
       </div>
       <button className="btn btn-primary" onClick={onStart}>
         Bora começar

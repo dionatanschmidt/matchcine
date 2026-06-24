@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, KeyboardEvent } from 'react';
 import type { AppState, TasteHistoryEntry } from '@/lib/types';
 import { SERVICES, POOL, GRAD } from '@/lib/data';
 
@@ -77,7 +77,15 @@ function StepServices({ state, onUpdate, onNext }: { state: AppState; onUpdate: 
         ))}
       </div>
       <div className="spacer" />
-      <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={onNext}>Continuar</button>
+      {state.services.length > 0 && (
+        <button
+          className="btn btn-primary"
+          style={{ marginTop: 16, animation: 'fade .35s ease' }}
+          onClick={onNext}
+        >
+          Continuar
+        </button>
+      )}
       <button className="skip" onClick={onNext}>Vejo em qualquer um / pular</button>
     </>
   );
@@ -100,7 +108,23 @@ function initTasteBoard(state: AppState): { board: (number | null)[]; queue: num
 function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p: Partial<AppState>) => void; onNext: () => void }) {
   const [cellAnims, setCellAnims] = useState<CellAnim[]>(Array(9).fill('idle'));
   const [isAnimating, setIsAnimating] = useState(false);
+  const [images, setImages] = useState<Record<number, string>>({});
   const chipRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch('/api/taste-images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: POOL.map(item => ({ n: item.n, t: item.t })) }),
+    })
+      .then(r => r.json())
+      .then((data: Record<string, string>) => {
+        const byIdx: Record<number, string> = {};
+        POOL.forEach((item, i) => { if (data[item.n]) byIdx[i] = data[item.n]; });
+        setImages(byIdx);
+      })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initialize taste board on first render
   const boardRef = useRef<{ board: (number | null)[]; queue: number[]; history: TasteHistoryEntry[] } | null>(null);
@@ -200,6 +224,14 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
           return (
             <div key={cell} className={`t9card${anim !== 'idle' ? ` ${anim}` : ''}`}>
               <div className="t9art" style={{ background: `linear-gradient(150deg, ${grad[0]}, ${grad[1]})` }}>
+                {images[idx] && (
+                  <img
+                    src={images[idx]}
+                    alt={item.n}
+                    loading="lazy"
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                )}
                 <span className="t9stamp s-dislike">👎</span>
                 <span className="t9stamp s-like">❤️</span>
                 <span className="t9stamp s-fav">⭐</span>

@@ -168,86 +168,60 @@ export async function POST(req: NextRequest) {
     'vote_average.gte': '6.5',
     'vote_count.gte':   '80',
     sort_by:            'popularity.desc',
-    page:               String(Math.floor(Math.random() * 3) + 1), // variedade
   });
 
-  // Provedores selecionados pelo usuário
   if (services.length > 0) {
     const ids = (services as string[]).flatMap(s => PROVIDER_IDS[s] ?? []);
-    if (ids.length > 0) {
-      params.set('with_watch_providers', ids.join('|'));
-    }
+    if (ids.length > 0) params.set('with_watch_providers', ids.join('|'));
   }
+  if (energy === 'baixo') params.set('with_runtime.lte', '100');
+  if (genre && GENRE_IDS[genre]) params.set('with_genres', String(GENRE_IDS[genre]));
 
-  // Fôlego baixo → filmes curtos (≤ 100 min)
-  if (energy === 'baixo') {
-    params.set('with_runtime.lte', '100');
-  }
-
-  // Gênero escolhido pelo usuário
-  if (genre && GENRE_IDS[genre]) {
-    params.set('with_genres', String(GENRE_IDS[genre]));
-  }
-
-  // --- Chamada 1: lista de filmes do TMDB ---
-  const discoverRes = await fetch(
-    `https://api.themoviedb.org/3/discover/movie?${params}`,
-    { next: { revalidate: 300 } }  // cache de 5 min no servidor
-  );
-
-  if (!discoverRes.ok) {
-    return NextResponse.json({ error: 'Erro ao buscar filmes no TMDB.' }, { status: 502 });
-  }
-
-  const discoverData = await discoverRes.json();
-  const results: TMDBMovie[] = discoverData.results ?? [];
-
-  if (results.length === 0) {
-    return NextResponse.json({ error: 'Nenhum filme encontrado com esses filtros.' }, { status: 404 });
-  }
-
-  // Remove filmes já mostrados nesta sessão
-  const pool = results.filter(m => !shown.includes(m.title) && !shown.includes(m.original_title));
-  const sessionFiltered = pool.length > 0 ? pool : results;
-
-  // Remove filmes já avaliados em sessões anteriores (histórico do banco)
   const historyIds = shownTmdbIds as number[];
-  const historyFiltered = historyIds.length > 0
-    ? sessionFiltered.filter(m => !historyIds.includes(m.id))
-    : sessionFiltered;
 
-  console.log(`[recommend] página ${params.get('page')}: ${results.length} resultados | excluindo ${historyIds.length} ids (${historyIds.join(', ')}) | session-filtered: ${sessionFiltered.length} | history-filtered: ${historyFiltered.length}`);
+  // Inicia em página aleatória para variedade; expande para as demais se faltar candidatos
+  const startPage = Math.floor(Math.random() * 3) + 1;
+  const pageOrder = [startPage, ...[1, 2, 3].filter(p => p !== startPage)];
 
-  // Se poucos candidatos sobraram após os filtros, busca uma segunda página antes de ceder
-  let candidates: TMDBMovie[];
+  let allDiscovered: TMDBMovie[] = [];
+  let candidates: TMDBMovie[] = [];
 
-  if (historyFiltered.length >= 3) {
-    candidates = historyFiltered.slice(0, 15);
-  } else {
-    const currentPage = parseInt(params.get('page') ?? '1');
-    const nextPage = currentPage >= 3 ? 1 : currentPage + 1;
-    params.set('page', String(nextPage));
-
-    let extraResults: TMDBMovie[] = [];
-    const res2 = await fetch(
+  for (const page of pageOrder) {
+    params.set('page', String(page));
+    const res = await fetch(
       `https://api.themoviedb.org/3/discover/movie?${params}`,
       { next: { revalidate: 300 } }
     );
-    if (res2.ok) {
-      const data2 = await res2.json() as { results?: TMDBMovie[] };
-      extraResults = data2.results ?? [];
+    if (!res.ok) break;
+
+    const data = await res.json();
+    const pageResults: TMDBMovie[] = data.results ?? [];
+    allDiscovered = [...allDiscovered, ...pageResults];
+
+    const pool = allDiscovered.filter(m => !shown.includes(m.title) && !shown.includes(m.original_title));
+    const sessionFiltered = pool.length > 0 ? pool : allDiscovered;
+    const histFiltered = historyIds.length > 0
+      ? sessionFiltered.filter(m => !historyIds.includes(m.id))
+      : sessionFiltered;
+
+    console.log(`[recommend] página ${page}: ${pageResults.length} resultados | excluídos: ${historyIds.length} ids | histFiltered: ${histFiltered.length} | acumulado: ${allDiscovered.length}`);
+
+    if (histFiltered.length >= 3) {
+      candidates = histFiltered.slice(0, 15);
+      break;
     }
+  }
 
-    const allResults = [...results, ...extraResults];
-    const pool2 = allResults.filter(m => !shown.includes(m.title) && !shown.includes(m.original_title));
-    const sessionFiltered2 = pool2.length > 0 ? pool2 : allResults;
-    const historyFiltered2 = historyIds.length > 0
-      ? sessionFiltered2.filter(m => !historyIds.includes(m.id))
-      : sessionFiltered2;
+  // Todas as páginas esgotadas: remove filtro de histórico e avisa
+  if (candidates.length === 0) {
+    const pool = allDiscovered.filter(m => !shown.includes(m.title) && !shown.includes(m.original_title));
+    const sessionFiltered = pool.length > 0 ? pool : allDiscovered;
+    candidates = sessionFiltered.slice(0, 15);
+    console.log(`[recommend] histórico bloqueou todos os candidatos (${historyIds.length} ids em ${pageOrder.length} páginas) — filtro removido, usando ${candidates.length} candidatos.`);
+  }
 
-    candidates = (historyFiltered2.length >= 3 ? historyFiltered2 : sessionFiltered2).slice(0, 15);
-
-    console.log(`[recommend] página ${nextPage} extra: ${extraResults.length} | history-filtered combinado: ${historyFiltered2.length} | candidatos finais: ${candidates.length}`);
+  if (candidates.length === 0) {
+    return NextResponse.json({ error: 'Nenhum filme encontrado com esses filtros.' }, { status: 404 });
   }
 
   // --- Fase 3: pede à Claude para escolher o melhor filme ---

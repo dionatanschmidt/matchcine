@@ -1,6 +1,5 @@
 'use client';
 import { useState } from 'react';
-import Image from 'next/image';
 import type { AppState, Movie } from '@/lib/types';
 import { GENRE_EMOJI, MOODCOLORS } from '@/lib/data';
 
@@ -123,17 +122,13 @@ export function Poster({ movie: m, c1, c2, emoji, height }: {
       className="poster"
       style={{ height, background: `linear-gradient(150deg, ${c1}, ${c2})` }}
     >
-      {/* Imagem real do TMDB */}
       {m.poster_path && (
-        <Image
-          key={m.poster_path}
+        <img
           src={m.poster_path}
           alt={m.titulo}
-          fill
-          sizes="412px"
-          style={{ objectFit: 'cover' }}
-          unoptimized
-          priority
+          crossOrigin="anonymous"
+          loading="eager"
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
         />
       )}
       <div className="pgrain" />
