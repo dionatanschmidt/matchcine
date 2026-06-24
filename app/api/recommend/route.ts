@@ -216,8 +216,39 @@ export async function POST(req: NextRequest) {
     ? sessionFiltered.filter(m => !historyIds.includes(m.id))
     : sessionFiltered;
 
-  // Garante pelo menos 3 opções para a Claude; se não, ignora o filtro de histórico
-  const candidates = (historyFiltered.length >= 3 ? historyFiltered : sessionFiltered).slice(0, 15);
+  console.log(`[recommend] página ${params.get('page')}: ${results.length} resultados | excluindo ${historyIds.length} ids (${historyIds.join(', ')}) | session-filtered: ${sessionFiltered.length} | history-filtered: ${historyFiltered.length}`);
+
+  // Se poucos candidatos sobraram após os filtros, busca uma segunda página antes de ceder
+  let candidates: TMDBMovie[];
+
+  if (historyFiltered.length >= 3) {
+    candidates = historyFiltered.slice(0, 15);
+  } else {
+    const currentPage = parseInt(params.get('page') ?? '1');
+    const nextPage = currentPage >= 3 ? 1 : currentPage + 1;
+    params.set('page', String(nextPage));
+
+    let extraResults: TMDBMovie[] = [];
+    const res2 = await fetch(
+      `https://api.themoviedb.org/3/discover/movie?${params}`,
+      { next: { revalidate: 300 } }
+    );
+    if (res2.ok) {
+      const data2 = await res2.json() as { results?: TMDBMovie[] };
+      extraResults = data2.results ?? [];
+    }
+
+    const allResults = [...results, ...extraResults];
+    const pool2 = allResults.filter(m => !shown.includes(m.title) && !shown.includes(m.original_title));
+    const sessionFiltered2 = pool2.length > 0 ? pool2 : allResults;
+    const historyFiltered2 = historyIds.length > 0
+      ? sessionFiltered2.filter(m => !historyIds.includes(m.id))
+      : sessionFiltered2;
+
+    candidates = (historyFiltered2.length >= 3 ? historyFiltered2 : sessionFiltered2).slice(0, 15);
+
+    console.log(`[recommend] página ${nextPage} extra: ${extraResults.length} | history-filtered combinado: ${historyFiltered2.length} | candidatos finais: ${candidates.length}`);
+  }
 
   // --- Fase 3: pede à Claude para escolher o melhor filme ---
   const claudeChoice = await askClaude(candidates, {

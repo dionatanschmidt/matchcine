@@ -126,13 +126,14 @@ export function Poster({ movie: m, c1, c2, emoji, height }: {
       {/* Imagem real do TMDB */}
       {m.poster_path && (
         <Image
+          key={m.poster_path}
           src={m.poster_path}
           alt={m.titulo}
           fill
           sizes="412px"
           style={{ objectFit: 'cover' }}
-          loading="eager"
-          fetchPriority="high"
+          unoptimized
+          priority
         />
       )}
       <div className="pgrain" />
