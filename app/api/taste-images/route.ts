@@ -30,7 +30,10 @@ async function fetchImageUrl(item: Item, apiKey: string): Promise<string | null>
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.TMDB_API_KEY;
-  if (!apiKey) return NextResponse.json({});
+  if (!apiKey) {
+    console.log('[taste-images] TMDB_API_KEY não encontrada — retornando vazio');
+    return NextResponse.json({});
+  }
 
   const { items } = await req.json() as { items: Item[] };
   if (!Array.isArray(items) || items.length === 0) return NextResponse.json({});
@@ -47,5 +50,6 @@ export async function POST(req: NextRequest) {
     if (url) map[name] = url;
   }
 
+  console.log(`[taste-images] ${items.length} itens solicitados → ${Object.keys(map).length} imagens encontradas`);
   return NextResponse.json(map);
 }

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // IDs dos provedores de streaming no TMDB para o Brasil
 const PROVIDER_IDS: Record<string, number[]> = {
   'Netflix':       [8],
@@ -159,6 +162,8 @@ export async function POST(req: NextRequest) {
     loved = [],
     disliked = [],
   } = body;
+
+  console.log(`[recommend] shownTmdbIds recebidos (${(shownTmdbIds as number[]).length}):`, shownTmdbIds);
 
   // --- Monta parâmetros do /discover/movie ---
   const params = new URLSearchParams({
