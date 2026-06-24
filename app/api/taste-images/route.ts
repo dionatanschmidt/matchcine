@@ -29,6 +29,7 @@ async function fetchImageUrl(item: Item, apiKey: string): Promise<string | null>
 }
 
 export async function POST(req: NextRequest) {
+  console.log('[taste-images] API key present:', !!process.env.TMDB_API_KEY);
   const apiKey = process.env.TMDB_API_KEY;
   if (!apiKey) {
     console.log('[taste-images] TMDB_API_KEY não encontrada — retornando vazio');

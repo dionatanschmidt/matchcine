@@ -225,6 +225,29 @@ export async function POST(req: NextRequest) {
     console.log(`[recommend] histórico bloqueou todos os candidatos (${historyIds.length} ids em ${pageOrder.length} páginas) — filtro removido, usando ${candidates.length} candidatos.`);
   }
 
+  // Último recurso: busca sem filtros restritivos para garantir sempre um resultado
+  if (candidates.length === 0) {
+    console.log('[recommend] zero candidatos após fallback — buscando sem filtros restritivos');
+    const fallbackParams = new URLSearchParams({
+      api_key:            apiKey,
+      language:           'pt-BR',
+      watch_region:       'BR',
+      'vote_average.gte': '6.5',
+      'vote_count.gte':   '200',
+      sort_by:            'popularity.desc',
+      page:               '1',
+    });
+    const fallbackRes = await fetch(
+      `https://api.themoviedb.org/3/discover/movie?${fallbackParams}`,
+      { next: { revalidate: 300 } }
+    );
+    if (fallbackRes.ok) {
+      const fallbackData = await fallbackRes.json();
+      candidates = ((fallbackData.results ?? []) as TMDBMovie[]).slice(0, 15);
+      console.log(`[recommend] fallback sem filtros retornou ${candidates.length} candidatos`);
+    }
+  }
+
   if (candidates.length === 0) {
     return NextResponse.json({ error: 'Nenhum filme encontrado com esses filtros.' }, { status: 404 });
   }
