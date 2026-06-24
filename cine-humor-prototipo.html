@@ -1,0 +1,533 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sessão — protótipo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap');
+  :root{
+    --bg:#13111C; --bg-deep:#0C0A14; --raised:#1E1A2A; --raised-2:#2A2440; --line:#373050;
+    --amber:#FFB13C; --amber-soft:#FFC979; --glow:#7FE0D2; --ink:#F6F1EA; --muted:#A79BB8;
+    --muted-2:#6E6588; --love:#FF5C8A; --ok:#7BD08F; --violet:#9A7CFF; --pink:#FF5C9A;
+    --display:'Fraunces',Georgia,serif; --body:'Inter',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:radial-gradient(1100px 560px at 50% -8%, #2A1E45 0%, transparent 58%), var(--bg-deep);min-height:100%;font-family:var(--body);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .stage{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 14px}
+  .app{width:100%;max-width:412px;height:min(880px,calc(100vh - 48px));background:var(--bg);border-radius:34px;border:1px solid var(--line);box-shadow:0 40px 120px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.04);overflow:hidden;position:relative;display:flex;flex-direction:column}
+  .app::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:50;background:radial-gradient(120% 90% at 50% 30%, transparent 58%, rgba(0,0,0,.4) 100%);mix-blend-mode:multiply}
+  .grain{position:absolute;inset:0;pointer-events:none;z-index:51;opacity:.045;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+  .screen{flex:1;display:flex;flex-direction:column;padding:26px 24px 22px;overflow-y:auto;position:relative;z-index:2}
+  .screen::-webkit-scrollbar{width:0}
+  .eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted-2);font-weight:600;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+  .eyebrow .dot{color:var(--amber)}
+  h1.q{font-family:var(--display);font-weight:500;font-size:28px;line-height:1.1;letter-spacing:-.01em;margin-bottom:8px}
+  h1.q em{font-style:italic;color:var(--amber-soft)}
+  .sub{color:var(--muted);font-size:14px;line-height:1.5;margin-bottom:20px}
+  .flabel{font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--muted);margin:14px 2px 8px;display:flex;align-items:center;gap:7px}
+  .spacer{flex:1}
+  .cards{display:flex;flex-direction:column;gap:10px}
+  .card{text-align:left;background:var(--raised);border:1px solid var(--line);color:var(--ink);border-radius:16px;padding:15px 16px;font-family:var(--body);font-size:15px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:13px;transition:transform .12s ease,border-color .15s ease,background .15s ease}
+  .card .ico{font-size:21px;line-height:1;flex-shrink:0}
+  .card .cap{color:var(--muted);font-weight:400;font-size:12.5px;display:block;margin-top:2px}
+  .card:hover{border-color:var(--amber);background:var(--raised-2);transform:translateY(-1px)}
+  .card:active{transform:scale(.985)}
+  .card.allsvc{background:linear-gradient(120deg, rgba(154,124,255,.18), rgba(255,92,154,.14));border-color:rgba(154,124,255,.5)}
+  .card.allsvc:hover{border-color:var(--violet)}
+  .chipbox{background:var(--raised);border:1px solid var(--line);border-radius:16px;padding:12px;min-height:64px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}
+  .chip{background:var(--raised-2);border:1px solid var(--line);color:var(--ink);padding:7px 11px;border-radius:999px;font-size:13px;display:flex;align-items:center;gap:7px}
+  .chip b{font-weight:500}
+  .chip span{color:var(--muted-2);cursor:pointer;font-size:15px}
+  .chip span:hover{color:var(--love)}
+  .chipbox input{flex:1;min-width:130px;background:transparent;border:none;outline:none;color:var(--ink);font-family:var(--body);font-size:14px;padding:6px 4px}
+  .chipbox input::placeholder{color:var(--muted-2)}
+  .genres{display:flex;flex-wrap:wrap;gap:9px}
+  .gtag{background:var(--raised);border:1px solid var(--line);color:var(--ink);padding:9px 14px;border-radius:999px;font-size:13.5px;cursor:pointer;font-family:var(--body);transition:all .14s ease}
+  .gtag:hover{border-color:var(--glow)}
+  .gtag.on{background:var(--glow);color:#08222A;border-color:var(--glow);font-weight:600}
+  .gtag.onsvc{background:var(--amber);color:#2A1A04;border-color:var(--amber);font-weight:600}
+  .btn{width:100%;border:none;border-radius:14px;padding:15px;font-family:var(--body);font-size:15px;font-weight:600;cursor:pointer;transition:transform .12s ease,filter .15s ease}
+  .btn:active{transform:scale(.98)}
+  .btn-primary{background:var(--amber);color:#2A1A04;box-shadow:0 8px 24px rgba(255,177,60,.25)}
+  .btn-primary:hover{filter:brightness(1.05)}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  .btn-ghost:hover{color:var(--ink);border-color:var(--muted)}
+  .btn-row{display:flex;gap:10px;margin-top:12px}
+  .btn-row .btn{margin-top:0}
+  .btn.glow{animation:glowpulse 1.7s ease-in-out infinite}
+  @keyframes glowpulse{0%,100%{box-shadow:0 6px 20px rgba(255,177,60,.28)}50%{box-shadow:0 6px 34px rgba(255,177,60,.6)}}
+  .skip{background:none;border:none;color:var(--muted-2);font-size:13px;cursor:pointer;padding:8px;margin:12px auto 0;font-family:var(--body)}
+  .skip:hover{color:var(--muted)}
+  .express{display:block;width:100%;background:rgba(255,177,60,.08);border:1px dashed rgba(255,177,60,.4);color:var(--amber-soft);border-radius:13px;padding:12px;margin-top:14px;font-family:var(--body);font-size:13.5px;font-weight:500;cursor:pointer}
+  .express:hover{background:rgba(255,177,60,.14)}
+  .prog{display:flex;gap:5px;margin-bottom:18px}
+  .prog i{height:3px;flex:1;border-radius:3px;background:var(--line);transition:background .3s}
+  .prog i.done{background:var(--amber)}
+
+  /* ---- WELCOME ---- */
+  .welcome{justify-content:center;text-align:left;position:relative}
+  .glowblob{position:absolute;width:300px;height:300px;border-radius:50%;filter:blur(28px);pointer-events:none;z-index:0}
+  .glowblob.one{top:-30px;left:-50px;background:radial-gradient(closest-side, rgba(154,124,255,.55), transparent 70%);animation:float1 9s ease-in-out infinite alternate}
+  .glowblob.two{top:80px;right:-70px;background:radial-gradient(closest-side, rgba(255,92,154,.45), transparent 70%);animation:float2 11s ease-in-out infinite alternate}
+  @keyframes float1{to{transform:translate(20px,30px)}}
+  @keyframes float2{to{transform:translate(-24px,-20px)}}
+  .welcome>*{position:relative;z-index:1}
+  .welcome .logo{font-family:var(--display);font-size:14px;letter-spacing:.32em;text-transform:uppercase;color:var(--amber);margin-bottom:auto;padding-top:2px;display:flex;align-items:center}
+  .welcome .ver{font-family:var(--body);font-size:10px;letter-spacing:.1em;color:var(--muted-2);font-weight:600;margin-left:10px}
+  .welcome h1{font-family:var(--display);font-weight:600;font-size:42px;line-height:1.0;letter-spacing:-.02em;margin-bottom:16px}
+  .welcome h1 em{font-style:italic;font-weight:500;background:linear-gradient(100deg, var(--amber-soft), var(--pink));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .welcome p{color:var(--muted);font-size:15.5px;line-height:1.55;margin-bottom:20px;max-width:330px}
+  .how{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--muted-2);margin-bottom:26px;font-weight:500}
+  .how b{color:var(--ink);font-weight:600}
+  .how i{color:var(--violet);font-style:normal}
+  .credit{margin-top:18px;font-size:11px;letter-spacing:.08em;color:var(--muted-2);text-align:left}
+  .credit b{color:var(--muted);font-weight:600}
+
+  /* ---- TASTE TRAINER (grade 3x3) ---- */
+  .tback{background:none;border:1px solid var(--line);color:var(--muted);font-size:12.5px;padding:7px 13px;border-radius:999px;cursor:pointer;font-family:var(--body);align-self:flex-start;margin-bottom:12px;display:inline-flex;align-items:center;gap:6px}
+  .tback:hover:not(:disabled){border-color:var(--ink);color:var(--ink)}
+  .tback:disabled{opacity:.35;cursor:default}
+  @keyframes tin{from{opacity:0;transform:translateY(8px) scale(.96)}}
+  .t9grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .t9card{border-radius:13px;overflow:hidden;border:1px solid var(--line);display:flex;flex-direction:column;background:var(--raised);animation:tin .3s ease}
+  .t9card.empty{opacity:0;border:none;pointer-events:none}
+  .t9art{position:relative;min-height:74px;display:flex;flex-direction:column;justify-content:flex-end;padding:9px;transition:filter .25s ease}
+  .t9art::after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 22%, rgba(0,0,0,.58))}
+  .t9type{position:relative;font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.88);font-weight:700;z-index:2}
+  .t9name{position:relative;font-family:var(--display);font-weight:600;font-size:13px;line-height:1.05;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.6);z-index:2;margin-top:2px}
+  .t9stamp{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:42px;opacity:0;transform:scale(.4);transition:all .25s ease;z-index:3}
+  .t9card.chosen-like .s-like,.t9card.chosen-fav .s-fav,.t9card.chosen-dislike .s-dislike{opacity:1;transform:scale(1)}
+  .t9card.chosen-like .t9art,.t9card.chosen-fav .t9art,.t9card.chosen-dislike .t9art{filter:brightness(.45)}
+  .t9card.leaving{opacity:0;transform:scale(.82);transition:all .34s ease}
+  .t9acts{display:flex}
+  .t9btn{flex:1;border:none;border-top:1px solid var(--line);background:var(--raised);color:var(--ink);font-size:16px;padding:9px 0;cursor:pointer;transition:background .12s ease}
+  .t9btn + .t9btn{border-left:1px solid var(--line)}
+  .t9btn.b-dislike:hover{background:rgba(167,155,184,.16)}
+  .t9btn.b-like:hover{background:rgba(255,92,138,.2)}
+  .t9btn.b-fav:hover{background:rgba(255,177,60,.22)}
+  .tcount{text-align:center;font-size:12.5px;color:var(--muted);margin-top:12px;min-height:16px}
+  .tcount b{color:var(--amber-soft)}
+  .tbanner{background:linear-gradient(120deg, rgba(123,208,143,.14), rgba(127,224,210,.1));border:1px solid rgba(123,208,143,.35);border-radius:14px;padding:13px 15px;font-size:13.5px;color:var(--ink);line-height:1.45;margin-bottom:14px}
+  .tbanner b{color:var(--ok)}
+  .tleg{font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:14px}
+
+  /* ---- POSTER / RESULT ---- */
+  .poster{position:relative;width:100%;height:300px;border-radius:18px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;padding:18px;border:1px solid var(--line)}
+  .poster .pgrain{position:absolute;inset:0;opacity:.12;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");mix-blend-mode:overlay}
+  .poster .pwatermark{position:absolute;top:-10px;right:6px;font-size:120px;opacity:.16;line-height:1}
+  .poster .pshade{position:absolute;inset:0;background:linear-gradient(transparent 30%, rgba(0,0,0,.72) 100%)}
+  .poster .ptag{position:relative;font-family:var(--display);font-style:italic;font-size:13px;color:rgba(255,255,255,.85);margin-bottom:6px;text-shadow:0 1px 8px rgba(0,0,0,.5)}
+  .poster .ptitle{position:relative;font-family:var(--display);font-weight:600;font-size:30px;line-height:1.02;letter-spacing:-.01em;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.55)}
+  .poster .pyear{position:relative;font-size:12px;letter-spacing:.1em;color:rgba(255,255,255,.7);margin-top:8px;text-transform:uppercase}
+  .perf{display:flex;gap:11px;align-items:flex-start;background:rgba(127,224,210,.06);border:1px solid rgba(127,224,210,.16);border-radius:13px;padding:13px;margin-top:14px}
+  .perf .pin{font-size:16px}
+  .perf p{font-size:14px;line-height:1.5;color:var(--ink)}
+  .where{margin-top:12px;font-size:13px;display:flex;align-items:center;gap:8px;padding:11px 13px;border-radius:12px;background:var(--raised);border:1px solid var(--line)}
+  .where.in{border-color:rgba(123,208,143,.4);background:rgba(123,208,143,.08)}
+  .where .badge{font-weight:600}
+  .where.in .badge{color:var(--ok)}
+  .where.out .badge{color:var(--muted)}
+  .sheet{position:absolute;inset:0;z-index:40;background:rgba(8,6,14,.8);backdrop-filter:blur(6px);display:flex;flex-direction:column;justify-content:flex-end;padding:22px;animation:fade .2s ease}
+  @keyframes fade{from{opacity:0}}
+  .sheet .box{background:var(--raised);border:1px solid var(--line);border-radius:22px;padding:22px}
+  .sheet h3{font-family:var(--display);font-weight:500;font-size:20px;margin-bottom:16px;line-height:1.2}
+  .sheet h3 em{font-style:italic;color:var(--amber-soft)}
+  .learn{margin-top:16px;display:flex;gap:16px;font-size:12px;color:var(--muted-2);justify-content:center}
+  .learn b{color:var(--muted);font-weight:500}
+  .loading{align-items:center;justify-content:center;text-align:center}
+  .reel{width:64px;height:64px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--amber);animation:spin 1s linear infinite;margin-bottom:22px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading p{font-family:var(--display);font-style:italic;font-size:19px;color:var(--muted)}
+  .miss{font-size:12px;color:var(--muted-2);text-align:center;margin-top:10px;line-height:1.5}
+  @media (prefers-reduced-motion:reduce){.reel,.glowblob,.tcard{animation:none}}
+</style>
+
+<div class="stage"><div class="app"><div class="grain"></div><div id="screen" class="screen"></div></div></div>
+
+<script>
+const VERSION='v0.6';
+const state = {
+  view:'welcome',
+  services:[], likes:[], dislikes:[], likesPick:[], dislikesPick:[], favorites:[], endings:null,
+  tasteQueue:[], tasteHistory:[], board:[], tasteInit:false, tasteAnim:false,
+  ctx:{ feel:null, company:null, energy:null, genre:null },
+  express:false, opposite:false, oppositeOf:null,
+  loved:[], disliked:[], shown:[], watchedCount:0,
+  current:null, step:0, onboardStep:0,
+};
+const el = document.getElementById('screen');
+const esc = s => (s||'').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+const SERVICES = ['Netflix','Prime Video','Max','Disney+','Globoplay','Apple TV+','Paramount+','Pluto TV','YouTube'];
+const POOL = [
+  {n:'Cidade de Deus',t:'Filme'},{n:'Tropa de Elite',t:'Filme'},{n:'Pulp Fiction',t:'Filme'},
+  {n:'Interestelar',t:'Filme'},{n:'Parasita',t:'Filme'},{n:'Bacurau',t:'Filme'},
+  {n:'O Senhor dos Anéis',t:'Filme'},{n:'Vingadores',t:'Filme'},{n:'Clube da Luta',t:'Filme'},
+  {n:'Matrix',t:'Filme'},{n:'Coringa',t:'Filme'},{n:'Whiplash',t:'Filme'},
+  {n:'O Auto da Compadecida',t:'Filme'},{n:'Central do Brasil',t:'Filme'},{n:'A Origem',t:'Filme'},
+  {n:'Que Horas Ela Volta?',t:'Filme'},{n:'Ainda Estou Aqui',t:'Filme'},{n:'Titanic',t:'Filme'},
+  {n:'Toy Story',t:'Filme'},{n:'Harry Potter',t:'Filme'},
+  {n:'Quentin Tarantino',t:'Diretor'},{n:'Christopher Nolan',t:'Diretor'},{n:'Fernando Meirelles',t:'Diretor'},
+  {n:'Wes Anderson',t:'Diretor'},{n:'Jordan Peele',t:'Diretor'},{n:'Walter Salles',t:'Diretor'},
+  {n:'Kleber Mendonça Filho',t:'Diretor'},{n:'Greta Gerwig',t:'Diretora'},{n:'Martin Scorsese',t:'Diretor'},
+  {n:'Steven Spielberg',t:'Diretor'},
+  {n:'Wagner Moura',t:'Ator'},{n:'Fernanda Montenegro',t:'Atriz'},{n:'Leonardo DiCaprio',t:'Ator'},
+  {n:'Denzel Washington',t:'Ator'},{n:'Selton Mello',t:'Ator'},{n:'Margot Robbie',t:'Atriz'},
+];
+const GRAD=[['#9A7CFF','#FF5C9A'],['#FFB13C','#FF5C9A'],['#6FD6C9','#9A7CFF'],['#FF7A59','#9A7CFF'],['#5BC0EB','#9A7CFF'],['#F0628A','#FFB13C']];
+const ENOUGH=6;
+
+function render(){
+  const v=state.view; el.className='screen';
+  if(v==='welcome'){el.classList.add('welcome');return renderWelcome();}
+  if(v==='onboard')return renderOnboard();
+  if(v==='context')return renderContext();
+  if(v==='loading'){el.classList.add('loading');return renderLoading();}
+  if(v==='result')return renderResult();
+  if(v==='done')return renderDone();
+}
+
+/* ---------- WELCOME ---------- */
+function renderWelcome(){
+  el.innerHTML = `
+    <div class="glowblob one"></div><div class="glowblob two"></div>
+    <div class="logo">Sessão <span class="ver">${VERSION}</span></div>
+    <h1>O filme certo,<br>sem rolar a<br><em>noite inteira.</em></h1>
+    <p>Diga como você chega. A Sessão escolhe <b style="color:var(--ink)">um</b> filme pro seu momento — e só do que você já assina.</p>
+    <div class="how"><b>como você está</b> <i>→</i> <b>com quem</b> <i>→</i> seu filme 🍿</div>
+    <button class="btn btn-primary" onclick="state.view='onboard';state.onboardStep=0;render()">Bora começar</button>
+    <button class="skip" onclick="state.view='context';state.step=0;render()">Já me conhece? Pular pro filme</button>
+    <div class="credit">by <b>Dionatan Schmidt</b> · ${VERSION}</div>`;
+}
+
+/* ---------- ONBOARDING ---------- */
+function renderOnboard(){
+  const s=state.onboardStep, total=3;
+  const prog=Array.from({length:total},(_,i)=>`<i class="${i<=s?'done':''}"></i>`).join('');
+  let body='';
+  if(s===0){
+    const tags=SERVICES.map(sv=>`<button class="gtag ${state.services.includes(sv)?'onsvc':''}" onclick="toggleService('${sv}')">${sv}</button>`).join('');
+    body=`
+      <h1 class="q">Onde você costuma <em>assistir?</em></h1>
+      <p class="sub">Vou priorizar filmes que estão nos seus streamings — nada de indicar algo que você não tem onde ver.</p>
+      <button class="card allsvc" onclick="selectAllServices()"><span class="ico">✨</span><div>Pode ser em todos<span class="cap">tenho acesso a tudo — seguir direto</span></div></button>
+      <div class="flabel" style="margin-top:16px">Ou escolha os seus:</div>
+      <div class="genres">${tags}</div>
+      <div class="spacer"></div>
+      <button class="btn btn-primary" onclick="nextOnboard()">Continuar</button>
+      <button class="skip" onclick="nextOnboard()">Vejo em qualquer um / pular</button>`;
+  } else if(s===1){
+    if(!state.tasteInit) initTaste();
+    const rated=state.tasteHistory.length, enough=rated>=ENOUGH, favs=state.favorites.length;
+    const grid=`<div class="t9grid">${[0,1,2,3,4,5,6,7,8].map(t9CellHTML).join('')}</div>`;
+    const banner = enough ? `<div class="tbanner">✅ <b>Já te conheço bem!</b> Pode avançar — ou continue marcando à vontade.</div>` : '';
+    const counter = rated ? `<div class="tcount"><b>${rated}</b> marcado${rated>1?'s':''}${favs?` · ⭐ ${favs} favorito${favs>1?'s':''}`:''}</div>` : `<div class="tcount">&nbsp;</div>`;
+    body=`
+      <button class="tback" onclick="undoTaste()" ${rated?'':'disabled'}>↩︎ Desfazer</button>
+      <h1 class="q">O que <em>combina</em> com você?</h1>
+      <p class="tleg">Em cada um: <b style="color:var(--muted)">👎 não curti</b>, <b style="color:var(--love)">❤️ gostei</b> ou <b style="color:var(--amber-soft)">⭐ favorito</b> (quando você ama demais). A cada escolha, entra outro.</p>
+      ${banner}
+      ${grid}
+      ${counter}
+      <button class="btn btn-primary ${enough?'glow':''}" style="margin-top:14px" onclick="nextOnboard()">${enough?'Avançar':'Continuar'}</button>
+      <div class="flabel" style="margin-top:22px">✍️ Quer citar um favorito específico?</div>
+      ${chipField('likes','Filme, diretor ou ator…')}
+      <div style="height:8px"></div>`;
+  } else {
+    body=`
+      <h1 class="q">Que tipo de final te agrada mais?</h1>
+      <p class="sub">Sem certo ou errado — é só o seu jeito de gostar.</p>
+      <div class="cards">
+        ${endCard('aberto','🌫️','Me deixa pensando','aberto, ambíguo, fica ecoando')}
+        ${endCard('fechado','🎀','Amarra tudo','resolvido, sem pontas soltas')}
+        ${endCard('reviravolta','🔀','Me surpreende','adoro uma boa reviravolta')}
+        ${endCard('tantofaz','🤷','Tanto faz','contanto que seja bom')}
+      </div>`;
+  }
+  el.innerHTML=`<div class="eyebrow"><span>Te conhecendo</span><span class="dot">●</span></div><div class="prog">${prog}</div>${body}`;
+  bindChips();
+}
+function endCard(v,ico,t,c){return `<button class="card" onclick="setEnding('${v}')"><span class="ico">${ico}</span><div>${t}<span class="cap">${c}</span></div></button>`;}
+function chipField(key,ph){
+  const chips=state[key].map((t,i)=>`<span class="chip"><b>${esc(t)}</b><span onclick="removeChip('${key}',${i})">×</span></span>`).join('');
+  return `<div class="chipbox" onclick="this.querySelector('input').focus()">${chips}<input data-key="${key}" placeholder="${ph}"></div>`;
+}
+function bindChips(){
+  el.querySelectorAll('.chipbox input').forEach(inp=>{
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&inp.value.trim()){state[inp.dataset.key].push(inp.value.trim());render();}});
+  });
+}
+window.toggleService=sv=>{const i=state.services.indexOf(sv);if(i>=0)state.services.splice(i,1);else state.services.push(sv);render();};
+window.selectAllServices=()=>{state.services=[...SERVICES];nextOnboard();};
+window.removeChip=(k,i)=>{state[k].splice(i,1);render();};
+window.setEnding=v=>{state.endings=v;state.view='context';state.step=0;render();};
+window.nextOnboard=()=>{if(state.onboardStep<2){state.onboardStep++;render();}else{state.view='context';state.step=0;render();}};
+
+/* ---------- TASTE TRAINER ---------- */
+function initTaste(){
+  const idx=[...Array(POOL.length).keys()];
+  for(let i=idx.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[idx[i],idx[j]]=[idx[j],idx[i]];}
+  const avail=idx.filter(i=>{const n=POOL[i].n;return !state.likesPick.includes(n)&&!state.dislikesPick.includes(n)&&!state.favorites.includes(n);});
+  state.board=avail.slice(0,9);
+  state.tasteQueue=avail.slice(9);
+  state.tasteInit=true;
+}
+function t9CellHTML(cell){
+  const idx=state.board[cell];
+  if(idx==null||idx===undefined) return `<div class="t9card empty" id="t9-${cell}"></div>`;
+  const s=POOL[idx], g=GRAD[idx%GRAD.length];
+  return `<div class="t9card" id="t9-${cell}">
+    <div class="t9art" style="background:linear-gradient(150deg, ${g[0]}, ${g[1]})">
+      <span class="t9stamp s-dislike">👎</span><span class="t9stamp s-like">❤️</span><span class="t9stamp s-fav">⭐</span>
+      <div class="t9type">${s.t}</div><div class="t9name">${esc(s.n)}</div>
+    </div>
+    <div class="t9acts">
+      <button class="t9btn b-dislike" onclick="rateTaste(${cell},'dislike')" title="Não curti">👎</button>
+      <button class="t9btn b-like" onclick="rateTaste(${cell},'like')" title="Gostei">❤️</button>
+      <button class="t9btn b-fav" onclick="rateTaste(${cell},'fav')" title="Favorito">⭐</button>
+    </div>
+  </div>`;
+}
+window.rateTaste=(cell,verdict)=>{
+  if(state.tasteAnim) return;
+  const idx=state.board[cell]; if(idx==null||idx===undefined) return;
+  const name=POOL[idx].n;
+  if(verdict==='like') state.likesPick.push(name);
+  else if(verdict==='fav') state.favorites.push(name);
+  else state.dislikesPick.push(name);
+  const replacement = state.tasteQueue.length ? state.tasteQueue.shift() : null;
+  state.tasteHistory.push({cell,idx,verdict,replacedWith:replacement});
+  state.board[cell]=replacement;
+  state.tasteAnim=true;
+  const cellEl=document.getElementById('t9-'+cell);
+  if(cellEl){
+    cellEl.classList.add('chosen-'+verdict);
+    setTimeout(()=>{ cellEl.classList.add('leaving'); setTimeout(()=>{ state.tasteAnim=false; render(); },360); },560);
+  } else { state.tasteAnim=false; render(); }
+};
+window.undoTaste=()=>{
+  if(state.tasteAnim) return;
+  const h=state.tasteHistory.pop(); if(!h) return;
+  const name=POOL[h.idx].n;
+  const arr = h.verdict==='like'?state.likesPick : h.verdict==='fav'?state.favorites : state.dislikesPick;
+  const k=arr.indexOf(name); if(k>=0) arr.splice(k,1);
+  if(h.replacedWith!=null) state.tasteQueue.unshift(h.replacedWith);
+  state.board[h.cell]=h.idx;
+  render();
+};
+
+/* ---------- CONTEXT ---------- */
+function renderContext(){
+  const s=state.step;
+  const prog=[0,1,2,3].map(i=>`<i class="${i<=s?'done':''}"></i>`).join('');
+  let body='';
+  if(s===0){
+    body=`
+      <h1 class="q">Como você chega pro filme hoje?</h1>
+      <p class="sub">Me diz como você está agora — eu decido se combino com o clima ou se te levanto.</p>
+      <div class="cards">
+        ${feelCard('cansado','😮‍💨','Cansado','quero desligar a cabeça')}
+        ${feelCard('agitado','🌀','Agitado, ansioso','preciso desacelerar')}
+        ${feelCard('entediado','🥱','Entediado','me fisga, por favor')}
+        ${feelCard('pra_baixo','🌧️','Meio pra baixo','algo que me levante ou me deixe sentir')}
+        ${feelCard('tranquilo','🍃','Tranquilo','aberto a qualquer coisa boa')}
+        ${feelCard('ligado','🔥','A fim de intensidade','pode vir pesado')}
+      </div>`;
+  } else if(s===1){
+    body=`
+      <h1 class="q">Com quem você está?</h1>
+      <p class="sub">Muda bastante o que cai bem.</p>
+      <div class="cards">
+        ${ctxCard('company','sozinho','🛋️','Sozinho, no meu canto')}
+        ${ctxCard('company','dois','💑','A dois')}
+        ${ctxCard('company','amigos','🍻','Com amigos')}
+        ${ctxCard('company','familia_kids','👨‍👩‍👧','Família, com crianças')}
+        ${ctxCard('company','familia','🧑‍🤝‍🧑','Família, só gente grande')}
+      </div>
+      <button class="express" onclick="expressGo()">Já chega — me dá o filme ⚡</button>`;
+  } else if(s===2){
+    body=`
+      <h1 class="q">Quanto fôlego você tem?</h1>
+      <p class="sub">De algo curto pra deixar rolando a um filme que exige você inteiro.</p>
+      <div class="cards">
+        ${ctxCard('energy','baixo','🪫','Pouco','algo leve e curto, dá pra mexer no celular')}
+        ${ctxCard('energy','medio','🔋','Médio','quero curtir, mas sem esforço')}
+        ${ctxCard('energy','alto','⚡','Total','me dá algo denso e longo, presto atenção em tudo')}
+      </div>
+      <button class="express" onclick="expressGo()">Já chega — me dá o filme ⚡</button>`;
+  } else {
+    const genres=['Ação','Terror','Comédia','Drama','Ficção','Romance','Suspense','Animação','Documentário'];
+    const tags=genres.map(g=>`<button class="gtag ${state.ctx.genre===g?'on':''}" onclick="pickGenre('${g}')">${g}</button>`).join('');
+    body=`
+      <h1 class="q">Tem um gênero na cabeça?</h1>
+      <p class="sub">Ou deixa comigo — escolho pelo seu momento.</p>
+      <button class="card" style="margin-bottom:16px" onclick="pickGenre(null);finishContext()"><span class="ico">🎲</span><div>Escolhe por mim<span class="cap">o melhor pro seu estado agora</span></div></button>
+      <div class="genres">${tags}</div>
+      <div class="spacer"></div>
+      <button class="btn btn-primary" onclick="finishContext()">Me dá um filme</button>`;
+  }
+  el.innerHTML=`<div class="eyebrow"><span>Agora há pouco</span><span class="dot">●</span></div><div class="prog">${prog}</div>${body}`;
+}
+function feelCard(v,ico,t,c){return `<button class="card" onclick="setCtx('feel','${v}')"><span class="ico">${ico}</span><div>${t}<span class="cap">${c}</span></div></button>`;}
+function ctxCard(key,v,ico,t,c){return `<button class="card" onclick="setCtx('${key}','${v}')"><span class="ico">${ico}</span><div>${t}${c?`<span class="cap">${c}</span>`:''}</div></button>`;}
+window.setCtx=(k,v)=>{state.ctx[k]=v;state.step++;render();};
+window.pickGenre=g=>{state.ctx.genre=g;render();};
+window.finishContext=()=>{state.express=false;state.opposite=false;state.shown=[];recommend();};
+window.expressGo=()=>{state.express=true;state.opposite=false;state.shown=[];recommend();};
+
+/* ---------- ENGINE ---------- */
+async function recommend(){
+  state.view='loading'; render();
+  const movie=await getValidMovie();
+  state.current=movie;
+  if(movie&&movie.titulo) state.shown.push(movie.titulo);
+  state.view='result'; render();
+}
+async function getValidMovie(){
+  for(let i=0;i<3;i++){
+    let m=null;
+    try{ m=await askAI(); }catch(e){ m=null; }
+    if(!m) break;
+    if(state.services.length && m.no_seu_streaming===false){ if(m.titulo) state.shown.push(m.titulo); continue; }
+    return m;
+  }
+  return fallbackPick();
+}
+function buildPrompt(){
+  const c=state.ctx;
+  const feelMap={cansado:'cansada, querendo desligar a cabeça',agitado:'agitada/ansiosa, precisando desacelerar',entediado:'entediada, querendo ser fisgada',pra_baixo:'meio pra baixo — quer algo que levante o astral ou deixe sentir de verdade',tranquilo:'tranquila e aberta a qualquer coisa boa',ligado:'a fim de intensidade, topa algo pesado'};
+  const compMap={sozinho:'sozinha',dois:'a dois (casal)',amigos:'com amigos',familia_kids:'em família COM crianças (precisa ser apropriado)',familia:'em família, só adultos'};
+  const enMap={baixo:'pouco fôlego — algo leve e curto',medio:'fôlego médio — quer curtir sem esforço',alto:'fôlego total — topa um filme denso e longo'};
+  const endMap={aberto:'finais abertos/ambíguos',fechado:'finais fechados/resolvidos',reviravolta:'boas reviravoltas',tantofaz:'tanto faz, desde que bom'};
+  const svc=state.services.length?state.services.join(', '):'(não informou — pode sugerir de qualquer serviço)';
+  const opp = state.opposite && state.oppositeOf ? `IMPORTANTE: a sugestão anterior ("${state.oppositeOf}") NÃO agradou. Traga algo DELIBERADAMENTE OPOSTO em tom, ritmo e clima.\n` : '';
+  return `Você é um curador de cinema afiado (clássicos a lançamentos, cinema brasileiro e mundial). Sugira UM ÚNICO filme para esta pessoa agora, capriche e evite o óbvio quando puder.
+
+${opp}ESTADO ATUAL dela: ${feelMap[c.feel]||'—'}. (Decida se faz mais sentido um filme que ACOMPANHA esse estado ou que o CONTRABALANCEIA.)
+Companhia: ${compMap[c.company]||'(não informou)'}.
+Fôlego: ${enMap[c.energy]||'(não informou)'}.
+Gênero pedido: ${c.genre||'sem preferência — escolha pelo estado dela'}.
+Final que ela curte: ${endMap[state.endings]||'tanto faz'}.
+${state.express?'MODO EXPRESSO: ela quer rapidez — infira o resto e entregue algo certeiro.\n':''}AMA (filmes/diretores/atores): ${[...state.likes,...state.likesPick].join(', ')||'(não informou)'}.
+FAVORITOS (ama de paixão — dê PESO EXTRA a estes): ${state.favorites.join(', ')||'(nenhum)'}.
+EVITA: ${[...state.dislikes,...state.dislikesPick].join(', ')||'(nada)'}.
+STREAMINGS QUE ELA ASSINA: ${svc}. REGRA ABSOLUTA: se ela informou streamings, sugira SOMENTE filmes disponíveis em UM desses serviços no Brasil. Nunca sugira fora deles.
+Já AMOU: ${state.loved.join(', ')||'(nenhuma)'}. Já REJEITOU: ${state.disliked.join(', ')||'(nenhuma)'}.
+NÃO sugira (já vistos/mostrados): ${state.shown.join(', ')||'(nenhum)'}.
+
+Responda APENAS com JSON, sem markdown:
+{"titulo":"","ano":0,"genero":"","duracao":"1h 50min","tagline":"meia-frase poética curta","porque":"frase calorosa do porquê combina com o momento dela","onde_assistir":"o serviço onde está no Brasil (de preferência um que ela assina)","no_seu_streaming":true,"cor1":"#hex escuro do clima","cor2":"#hex pro degradê"}`;
+}
+async function askAI(){
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:buildPrompt()}]})});
+  const data=await res.json();
+  const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+  const clean=text.replace(/```json|```/g,'').trim();
+  const a=clean.indexOf('{'),b=clean.lastIndexOf('}');
+  return JSON.parse(clean.slice(a,b+1));
+}
+const HEX=/^#[0-9a-fA-F]{6}$/;
+const MOODCOLORS={cansado:['#1b2436','#3a3550'],agitado:['#2a1b36','#542f3f'],entediado:['#162a2e','#2f5246'],pra_baixo:['#1a2230','#445a6e'],tranquilo:['#1e2a22','#4a6b52'],ligado:['#2e1414','#6b2f2f']};
+function safeColors(m){
+  let c1=HEX.test(m.cor1||'')?m.cor1:null,c2=HEX.test(m.cor2||'')?m.cor2:null;
+  if(!c1||!c2){const f=MOODCOLORS[state.ctx.feel]||['#241B30','#19131F'];c1=c1||f[0];c2=c2||f[1];}
+  return [c1,c2];
+}
+const GENRE_EMOJI={'Ação':'💥','Terror':'🔪','Comédia':'😄','Drama':'🎭','Ficção':'🛸','Romance':'❤️','Suspense':'🩸','Animação':'✨','Documentário':'🎞️','Aventura':'🧭'};
+const OPPOSITE={cansado:'ligado',agitado:'ligado',entediado:'tranquilo',pra_baixo:'ligado',tranquilo:'ligado',ligado:'tranquilo'};
+const FALLBACK={
+  cansado:[
+    {titulo:'O Grande Hotel Budapeste',ano:2014,genero:'Comédia',duracao:'1h 39min',tagline:'um conto de fadas para gente grande',porque:'Leve, lindo e fácil quando a cabeça já está cheia.',onde_assistir:'Disney+',no_seu_streaming:true,cor1:'#3a1f33',cor2:'#a8607a'},
+    {titulo:'Ratatouille',ano:2007,genero:'Animação',duracao:'1h 51min',tagline:'qualquer um pode cozinhar',porque:'Aconchegante e sem peso nenhum pra relaxar.',onde_assistir:'Disney+',no_seu_streaming:true,cor1:'#2e1d10',cor2:'#9a5a2a'},
+    {titulo:'Simplesmente Amor',ano:2003,genero:'Romance',duracao:'2h 15min',tagline:'o amor está em toda parte',porque:'Quentinho e leve, ideal pra desligar.',onde_assistir:'verifique a disponibilidade',no_seu_streaming:false,cor1:'#2a1622',cor2:'#7a3a52'}],
+  agitado:[
+    {titulo:'Paterson',ano:2016,genero:'Drama',duracao:'1h 58min',tagline:'a poesia nos dias iguais',porque:'Calmo e contemplativo pra desacelerar de verdade.',onde_assistir:'verifique a disponibilidade',no_seu_streaming:false,cor1:'#16202e',cor2:'#3d5a72'},
+    {titulo:'Para Meu Pai',ano:2017,genero:'Drama',duracao:'1h 33min',tagline:'respirar fundo',porque:'Um ritmo lento que acalma a cabeça agitada.',onde_assistir:'verifique a disponibilidade',no_seu_streaming:false,cor1:'#1a2422',cor2:'#42665e'},
+    {titulo:'Comer, Rezar, Amar',ano:2010,genero:'Drama',duracao:'2h 13min',tagline:'reencontrar o próprio eixo',porque:'Convida a respirar e contemplar.',onde_assistir:'verifique a disponibilidade',no_seu_streaming:false,cor1:'#22201a',cor2:'#6e5e3a'}],
+  entediado:[
+    {titulo:'À Prova de Morte',ano:2007,genero:'Ação',duracao:'1h 53min',tagline:'segura o volante',porque:'Te fisga e não solta — ótimo contra o tédio.',onde_assistir:'verifique a disponibilidade',no_seu_streaming:false,cor1:'#2a1212',cor2:'#7a3030'},
+    {titulo:'Enola Holmes',ano:2020,genero:'Aventura',duracao:'2h 03min',tagline:'o jogo começou',porque:'Esperto e ágil pra acordar o interesse.',onde_assistir:'Netflix',no_seu_streaming:true,cor1:'#16242a',cor2:'#3a6670'},
+    {titulo:'Truque de Mestre',ano:2013,genero:'Suspense',duracao:'1h 55min',tagline:'olhe mais de perto',porque:'Cheio de reviravoltas pra te prender.',onde_assistir:'verifique a disponibilidade',no_seu_streaming:false,cor1:'#1a1430',cor2:'#4a3a7a'}],
+  pra_baixo:[
+    {titulo:'A Vida é Bela',ano:1997,genero:'Drama',duracao:'1h 56min',tagline:'amor mais forte que tudo',porque:'Toca fundo e ainda levanta o coração no fim.',onde_assistir:'verifique a disponibilidade',no_seu_streaming:false,cor1:'#1f2810',cor2:'#6b7a3a'},
+    {titulo:'Up: Altas Aventuras',ano:2009,genero:'Animação',duracao:'1h 36min',tagline:'aventura lá em cima',porque:'Emociona e reanima ao mesmo tempo.',onde_assistir:'Disney+',no_seu_streaming:true,cor1:'#16242e',cor2:'#3a7080'},
+    {titulo:'Pequena Miss Sunshine',ano:2006,genero:'Comédia',duracao:'1h 41min',tagline:'siga em frente',porque:'Doce-amarga, daquelas que confortam.',onde_assistir:'verifique a disponibilidade',no_seu_streaming:false,cor1:'#2a2410',cor2:'#8a7a2a'}],
+  tranquilo:[
+    {titulo:'A Chegada',ano:2016,genero:'Ficção',duracao:'1h 56min',tagline:'o tempo não é o que parece',porque:'Bonito e reflexivo, perfeito quando você está aberto.',onde_assistir:'verifique a disponibilidade',no_seu_streaming:false,cor1:'#16242e',cor2:'#3a6b72'},
+    {titulo:'Histórias Cruzadas',ano:2011,genero:'Drama',duracao:'2h 26min',tagline:'coragem em vozes',porque:'Envolvente e calorosa pra um momento tranquilo.',onde_assistir:'verifique a disponibilidade',no_seu_streaming:false,cor1:'#221a14',cor2:'#6e523a'},
+    {titulo:'Amélie Poulain',ano:2001,genero:'Romance',duracao:'2h 02min',tagline:'pequenos prazeres',porque:'Encantador e leve, do tipo que aquece.',onde_assistir:'verifique a disponibilidade',no_seu_streaming:false,cor1:'#1f2410',cor2:'#6a7a2a'}],
+  ligado:[
+    {titulo:'Mad Max: Estrada da Fúria',ano:2015,genero:'Ação',duracao:'2h',tagline:'que dia lindo',porque:'Adrenalina pura pra quem topa intensidade.',onde_assistir:'Max',no_seu_streaming:true,cor1:'#2e1606',cor2:'#c0701a'},
+    {titulo:'John Wick',ano:2014,genero:'Ação',duracao:'1h 41min',tagline:'não mexa com ele',porque:'Visceral e sem freio do início ao fim.',onde_assistir:'verifique a disponibilidade',no_seu_streaming:false,cor1:'#1a1620',cor2:'#5a2a3a'},
+    {titulo:'Corra!',ano:2017,genero:'Terror',duracao:'1h 44min',tagline:'fique atento',porque:'Tenso e afiado pra quem quer pegar pesado.',onde_assistir:'verifique a disponibilidade',no_seu_streaming:false,cor1:'#16201a',cor2:'#3a6648'}],
+};
+function fallbackPick(){
+  const moodKey = state.opposite ? (OPPOSITE[state.ctx.feel]||'tranquilo') : (state.ctx.feel||'tranquilo');
+  const pool = FALLBACK[moodKey]||FALLBACK.tranquilo;
+  const opt = {...(pool.find(m=>!state.shown.includes(m.titulo))||pool[0])};
+  if(state.services.length){ opt.onde_assistir=state.services[0]; opt.no_seu_streaming=true; }
+  opt._fallback=true;
+  return opt;
+}
+function posterHTML(m,h){
+  const [c1,c2]=safeColors(m); const emoji=GENRE_EMOJI[m.genero]||'🎬';
+  return `<div class="poster" style="height:${h||300}px;background:linear-gradient(150deg, ${c1}, ${c2})">
+    <div class="pgrain"></div><div class="pwatermark">${emoji}</div><div class="pshade"></div>
+    ${m.tagline?`<div class="ptag">${esc(m.tagline)}</div>`:''}
+    <div class="ptitle">${esc(m.titulo||'—')}</div>
+    <div class="pyear">${m.ano||''} ${m.genero?'· '+esc(m.genero):''} ${m.duracao?'· '+esc(m.duracao):''}</div></div>`;
+}
+function whereHTML(m){
+  const hasServices=state.services.length>0, inSvc=m.no_seu_streaming!==false;
+  let onde=m.onde_assistir||'';
+  if(hasServices && (!onde || /verifique/i.test(onde))) onde=state.services[0];
+  if(hasServices && inSvc) return `<div class="where in">✓ <span>Está no seu <b class="badge">${esc(onde||'streaming')}</b></span></div>`;
+  if(hasServices && !inSvc) return `<div class="where out">▸ <span>Fora dos seus streamings — em <b class="badge">${esc(onde||'outro serviço')}</b></span></div>`;
+  return `<div class="where">▸ <span>Onde achar: <b class="badge" style="color:var(--amber-soft)">${esc(m.onde_assistir||'verifique a disponibilidade')}</b></span></div>`;
+}
+function renderLoading(){ el.innerHTML=`<div class="reel"></div><p>Procurando o filme certo<br>pro seu momento…</p>`; }
+function renderResult(){
+  const m=state.current||{};
+  el.innerHTML=`
+    <div class="eyebrow"><span>Em cartaz pra você</span><span class="dot">●</span></div>
+    ${posterHTML(m)}
+    <div class="perf"><span class="pin">✦</span><p>${esc(m.porque||'')}</p></div>
+    ${whereHTML(m)}
+    <div style="margin-top:16px">
+      <button class="btn btn-primary" onclick="loveIt()">Bora, é esse</button>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="openWatched()">Já assisti</button>
+        <button class="btn btn-ghost" onclick="nextOne()">Mostra outro</button>
+      </div>
+      <button class="express" onclick="oppositeOne()">Não é minha vibe — me dá o oposto disso 🔄</button>
+    </div>
+    <div class="learn"><span>❤ <b>${state.loved.length}</b> amados</span><span>👁 <b>${state.watchedCount}</b> vistos</span><span>↻ <b>${state.disliked.length}</b> descartados</span></div>
+    ${m._fallback?'<p class="miss">(sugestão da lista de segurança — a IA não respondeu desta vez)</p>':''}`;
+}
+window.nextOne=()=>{state.opposite=false;if(state.current)state.disliked.push(state.current.titulo);recommend();};
+window.oppositeOne=()=>{if(state.current){state.disliked.push(state.current.titulo);state.oppositeOf=state.current.titulo;}state.opposite=true;recommend();};
+window.loveIt=()=>{if(state.current){state.loved.push(state.current.titulo);state.watchedCount++;}state.view='done';render();};
+window.openWatched=()=>{
+  const sheet=document.createElement('div');sheet.className='sheet';
+  sheet.innerHTML=`<div class="box"><h3>E aí, o que achou de <em>${esc(state.current.titulo)}</em>?</h3>
+    <button class="btn btn-primary" onclick="rateWatched(true)">Amei esse</button>
+    <div class="btn-row"><button class="btn btn-ghost" onclick="rateWatched(false)">Não curti muito</button><button class="btn btn-ghost" onclick="this.closest('.sheet').remove()">Voltar</button></div></div>`;
+  document.querySelector('.app').appendChild(sheet);
+};
+window.rateWatched=loved=>{
+  state.watchedCount++;
+  if(loved)state.loved.push(state.current.titulo);else state.disliked.push(state.current.titulo);
+  document.querySelector('.sheet')?.remove();recommend();
+};
+function renderDone(){
+  const m=state.current||{};
+  el.innerHTML=`
+    <div class="eyebrow"><span>Boa sessão</span><span class="dot">●</span></div>
+    ${posterHTML(m,340)}
+    <p class="sub" style="text-align:center;margin:18px auto 4px">Aproveita 🍿 Vou lembrar que você curtiu isso pra acertar ainda mais da próxima.</p>
+    <div class="spacer"></div>
+    <button class="btn btn-primary" onclick="restartSession()">Quero outro filme</button>
+    <button class="skip" onclick="hardReset()">Recomeçar do zero</button>`;
+}
+window.restartSession=()=>{state.ctx={feel:null,company:null,energy:null,genre:null};state.express=false;state.opposite=false;state.oppositeOf=null;state.step=0;state.shown=[];state.view='context';render();};
+window.hardReset=()=>{Object.assign(state,{view:'welcome',services:[],likes:[],dislikes:[],likesPick:[],dislikesPick:[],favorites:[],endings:null,tasteQueue:[],tasteHistory:[],board:[],tasteInit:false,tasteAnim:false,ctx:{feel:null,company:null,energy:null,genre:null},express:false,opposite:false,oppositeOf:null,loved:[],disliked:[],shown:[],watchedCount:0,current:null,step:0,onboardStep:0});render();};
+
+render();
+</script>
