@@ -225,10 +225,11 @@ export default function SessaoApp() {
           loved:        s.loved,
           disliked:     s.disliked,
           shown:        s.shown,
-          // IDs já vistos: DB (logado) + local (anônimo)
+          // IDs já vistos: DB + local + current (localAvaliacoes ainda não foi atualizado quando saveRating→recommend são chamados em sequência)
           shownTmdbIds: [
             ...s.historicoDB.map(a => a.tmdb_id),
             ...s.localAvaliacoes.map(a => a.tmdb_id),
+            ...(s.current?.tmdb_id !== undefined ? [s.current.tmdb_id] : []),
           ],
         }),
       });

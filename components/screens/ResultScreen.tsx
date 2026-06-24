@@ -131,7 +131,8 @@ export function Poster({ movie: m, c1, c2, emoji, height }: {
           fill
           sizes="412px"
           style={{ objectFit: 'cover' }}
-          priority
+          loading="eager"
+          fetchPriority="high"
         />
       )}
       <div className="pgrain" />
