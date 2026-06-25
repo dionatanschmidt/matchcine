@@ -7,11 +7,12 @@ interface Props {
   state: AppState;
   onUpdate: (patch: Partial<AppState>) => void;
   onFinish: (endings?: string) => void;
+  onBack: () => void;
 }
 
 const ENOUGH = 6;
 
-export default function OnboardScreen({ state, onUpdate, onFinish }: Props) {
+export default function OnboardScreen({ state, onUpdate, onFinish, onBack }: Props) {
   const { onboardStep } = state;
   const total = 3;
 
@@ -24,9 +25,34 @@ export default function OnboardScreen({ state, onUpdate, onFinish }: Props) {
     else onFinish();
   };
 
+  const handleBack = () => {
+    if (onboardStep > 0) onUpdate({ onboardStep: onboardStep - 1 });
+    else onBack();
+  };
+
   return (
     <>
-      <div className="eyebrow"><span>Te conhecendo</span><span className="dot">●</span></div>
+      <div className="eyebrow">
+        <span>Te conhecendo</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            onClick={handleBack}
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--line)',
+              borderRadius: 20,
+              color: 'var(--muted)',
+              padding: '2px 10px',
+              fontSize: 13,
+              cursor: 'pointer',
+              lineHeight: 1.4,
+            }}
+          >
+            ‹ Voltar
+          </button>
+          <span className="dot">●</span>
+        </span>
+      </div>
       <div className="prog">{prog}</div>
       {onboardStep === 0 && (
         <StepServices state={state} onUpdate={onUpdate} onNext={nextOnboard} />

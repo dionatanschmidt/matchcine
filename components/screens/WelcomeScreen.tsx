@@ -23,9 +23,6 @@ export default function WelcomeScreen({ onStart, onSkip }: Props) {
         <strong style={{ color: 'var(--ink)' }}>um</strong> filme pro seu
         momento — e só do que você já assina.
       </p>
-      <div className="how">
-        <b>como chego</b> <i>→</i> <b>com quem estou</b> <i>→</i> meu filme 🍿
-      </div>
       <button className="btn btn-primary" onClick={onStart}>
         Bora começar
       </button>

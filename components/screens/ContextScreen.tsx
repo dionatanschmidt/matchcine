@@ -5,11 +5,12 @@ interface Props {
   state: AppState;
   onUpdate: (patch: Partial<AppState>) => void;
   onRecommend: (overrides?: Partial<AppState>) => void;
+  onBack: () => void;
 }
 
 const GENRES = ['Ação', 'Terror', 'Comédia', 'Drama', 'Ficção', 'Romance', 'Suspense', 'Animação', 'Documentário'];
 
-export default function ContextScreen({ state, onUpdate, onRecommend }: Props) {
+export default function ContextScreen({ state, onUpdate, onRecommend, onBack }: Props) {
   const { step, ctx } = state;
 
   const setCtx = (key: keyof typeof ctx, value: string) => {
@@ -18,6 +19,11 @@ export default function ContextScreen({ state, onUpdate, onRecommend }: Props) {
 
   const expressGo = () => {
     onRecommend({ express: true, opposite: false, shown: [] });
+  };
+
+  const handleBack = () => {
+    if (step > 0) onUpdate({ step: step - 1 });
+    else onBack();
   };
 
   const prog = [0, 1, 2, 3].map(i => (
@@ -110,7 +116,25 @@ export default function ContextScreen({ state, onUpdate, onRecommend }: Props) {
   return (
     <>
       <div className="eyebrow">
-        <span>Agora há pouco</span><span className="dot">●</span>
+        <span>Agora há pouco</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            onClick={handleBack}
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--line)',
+              borderRadius: 20,
+              color: 'var(--muted)',
+              padding: '2px 10px',
+              fontSize: 13,
+              cursor: 'pointer',
+              lineHeight: 1.4,
+            }}
+          >
+            ‹ Voltar
+          </button>
+          <span className="dot">●</span>
+        </span>
       </div>
       <div className="prog">{prog}</div>
       {body}

@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { AppState, Movie } from '@/lib/types';
-import { GENRE_EMOJI, MOODCOLORS } from '@/lib/data';
+import { GENRE_EMOJI, MOODCOLORS, SERVICES } from '@/lib/data';
 
 interface Props {
   state: AppState;
@@ -22,6 +22,8 @@ function safeColors(m: Movie, feel: string | null): [string, string] {
 
 export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao }: Props) {
   const [showSheet, setShowSheet] = useState(false);
+  const [showStreamSheet, setShowStreamSheet] = useState(false);
+  const [tempServices, setTempServices] = useState<string[]>([]);
   const m = state.current!;
   const [c1, c2] = safeColors(m, state.ctx.feel);
   const emoji = GENRE_EMOJI[m.genero?.split(',')[0]?.trim() ?? ''] ?? '🎬';
@@ -69,7 +71,25 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
 
       {/* Onde assistir */}
       {hasServices && inSvc ? (
-        <div className="where in">✓ <span>Está no seu <b className="badge">{onde || 'streaming'}</b></span></div>
+        <div className="where in" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>✓ Está no seu <b className="badge">{onde || 'streaming'}</b></span>
+          <button
+            onClick={() => { setTempServices([...state.services]); setShowStreamSheet(true); }}
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--line)',
+              borderRadius: 6,
+              color: 'var(--muted)',
+              padding: '2px 8px',
+              fontSize: 12,
+              cursor: 'pointer',
+              flexShrink: 0,
+              marginLeft: 8,
+            }}
+          >
+            ⇄ trocar
+          </button>
+        </div>
       ) : hasServices && !inSvc ? (
         <div className="where out">▸ <span>Fora dos seus streamings — em <b className="badge">{onde || 'outro serviço'}</b></span></div>
       ) : (
@@ -106,6 +126,51 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
               <button className="btn btn-ghost" onClick={() => rateWatched(false)}>Não curti muito</button>
               <button className="btn btn-ghost" onClick={() => setShowSheet(false)}>Voltar</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sheet "Trocar streaming" */}
+      {showStreamSheet && (
+        <div className="sheet">
+          <div className="box">
+            <h3>Em qual streaming?</h3>
+            <button
+              className="card allsvc"
+              style={{ marginBottom: 12 }}
+              onClick={() => setTempServices([...SERVICES])}
+            >
+              <span className="ico">✨</span>
+              <div>Pode ser em todos<span className="cap">selecionar todos os streamings</span></div>
+            </button>
+            <div className="genres">
+              {SERVICES.map(sv => (
+                <button
+                  key={sv}
+                  className={`gtag${tempServices.includes(sv) ? ' onsvc' : ''}`}
+                  onClick={() =>
+                    setTempServices(prev =>
+                      prev.includes(sv) ? prev.filter(s => s !== sv) : [...prev, sv]
+                    )
+                  }
+                >
+                  {sv}
+                </button>
+              ))}
+            </div>
+            <button
+              className="btn btn-primary"
+              style={{ marginTop: 16 }}
+              onClick={() => {
+                setShowStreamSheet(false);
+                onRecommend({ services: tempServices, opposite: false, shown: [] });
+              }}
+            >
+              Buscar novo filme
+            </button>
+            <button className="btn btn-ghost" onClick={() => setShowStreamSheet(false)}>
+              Cancelar
+            </button>
           </div>
         </div>
       )}

@@ -317,6 +317,7 @@ export default function SessaoApp() {
               state={state}
               onUpdate={update}
               onFinish={finishOnboard}
+              onBack={() => update({ view: 'welcome' })}
             />
           )}
           {state.view === 'context' && (
@@ -324,6 +325,7 @@ export default function SessaoApp() {
               state={state}
               onUpdate={update}
               onRecommend={recommend}
+              onBack={() => update({ view: 'onboard', onboardStep: 2 })}
             />
           )}
           {state.view === 'loading' && <LoadingScreen />}
