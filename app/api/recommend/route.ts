@@ -161,6 +161,7 @@ export async function POST(req: NextRequest) {
     dislikesPick = [],
     loved = [],
     disliked = [],
+    epoch,
   } = body;
 
   console.log(`[recommend] shownTmdbIds recebidos (${(shownTmdbIds as number[]).length}):`, shownTmdbIds);
@@ -181,6 +182,16 @@ export async function POST(req: NextRequest) {
   }
   if (energy === 'baixo') params.set('with_runtime.lte', '100');
   if (genre && GENRE_IDS[genre]) params.set('with_genres', String(GENRE_IDS[genre]));
+
+  const currentYear = new Date().getFullYear();
+  if (epoch === 'novo') {
+    params.set('primary_release_date.gte', `${currentYear - 3}-01-01`);
+  } else if (epoch === '2000s') {
+    params.set('primary_release_date.gte', '1990-01-01');
+    params.set('primary_release_date.lte', '2010-12-31');
+  } else if (epoch === 'classico') {
+    params.set('primary_release_date.lte', '1990-12-31');
+  }
 
   const historyIds = shownTmdbIds as number[];
 
@@ -310,6 +321,8 @@ export async function POST(req: NextRequest) {
     porque:           claudePorque ?? PORQUE_MAP[feel ?? ''] ?? 'Uma ótima escolha pro seu momento.',
     onde_assistir,
     no_seu_streaming: !!matchedService,
+    vote_average:     detail.vote_average ?? 0,
+    vote_count:       detail.vote_count ?? 0,
     cor1,
     cor2,
   });
@@ -335,6 +348,8 @@ interface TMDBDetail {
   overview: string;
   tagline: string;
   poster_path: string | null;
+  vote_average: number;
+  vote_count: number;
   genres: { id: number; name: string }[];
   'watch/providers'?: {
     results?: {

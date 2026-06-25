@@ -58,15 +58,63 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
 
   return (
     <>
-      <div className="eyebrow"><span>Em cartaz pra você</span><span className="dot">●</span></div>
+      <div className="eyebrow">
+        <span>Em cartaz pra você</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            onClick={() => onUpdate({ view: 'context', step: 3 })}
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--line)',
+              borderRadius: 20,
+              color: 'var(--muted)',
+              padding: '2px 10px',
+              fontSize: 13,
+              cursor: 'pointer',
+              lineHeight: 1.4,
+            }}
+          >
+            ‹ Voltar
+          </button>
+          <span className="dot">●</span>
+        </span>
+      </div>
 
       {/* Pôster */}
       <Poster movie={m} c1={c1} c2={c2} emoji={emoji} height={300} />
 
-      {/* Porquê */}
-      <div className="perf">
-        <span className="pin">✦</span>
-        <p>{m.porque}</p>
+      {/* Filtro de época */}
+      <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+        {([
+          { id: 'novo',    label: '🆕 Lançamento', bg: '#0d3318', border: '#2a7a42', color: '#6effa0' },
+          { id: '2000s',   label: '📼 Anos 2000',  bg: '#3a1a00', border: '#a04800', color: '#ffb347' },
+          { id: 'classico',label: '🎞️ Clássico',   bg: '#1e0d36', border: '#6b3fa0', color: '#c4a0ff' },
+        ] as const).map(opt => {
+          const active = state.epoch === opt.id;
+          return (
+            <button
+              key={opt.id}
+              onClick={() => {
+                const next = active ? null : opt.id;
+                onRecommend({ epoch: next, opposite: false, shown: [] });
+              }}
+              style={{
+                flex: 1,
+                padding: '7px 4px',
+                fontSize: 12,
+                fontWeight: 600,
+                borderRadius: 10,
+                cursor: 'pointer',
+                border: `1px solid ${active ? opt.border : 'var(--line)'}`,
+                background: active ? opt.bg : 'var(--raised)',
+                color: active ? opt.color : 'var(--muted)',
+                transition: 'all .18s ease',
+              }}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Onde assistir */}
@@ -74,7 +122,7 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
         <div className="where in" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>✓ Está no seu <b className="badge">{onde || 'streaming'}</b></span>
           <button
-            onClick={() => { setTempServices([...state.services]); setShowStreamSheet(true); }}
+            onClick={() => { setTempServices([]); setShowStreamSheet(true); }}
             style={{
               background: 'transparent',
               border: '1px solid var(--line)',
@@ -198,6 +246,23 @@ export function Poster({ movie: m, c1, c2, emoji, height }: {
       )}
       <div className="pgrain" />
       {!m.poster_path && <div className="pwatermark">{emoji}</div>}
+      {(m.vote_average ?? 0) > 0 && (
+        <div style={{
+          position: 'absolute',
+          top: 10,
+          left: 10,
+          background: 'rgba(0,0,0,0.65)',
+          borderRadius: 8,
+          padding: '4px 8px',
+          fontSize: 11,
+          color: '#fff',
+          fontWeight: 600,
+          zIndex: 2,
+          lineHeight: 1.3,
+        }}>
+          ⭐ {m.vote_average!.toFixed(1)}
+        </div>
+      )}
       <div className="pshade" />
       {m.tagline && <div className="ptag">{m.tagline}</div>}
       <div className="ptitle">{m.titulo}</div>

@@ -35,6 +35,7 @@ const initialState: AppState = {
   shown:        [],
   watchedCount: 0,
   current:      null,
+  epoch:        null,
   step:         0,
   onboardStep:  0,
   userId:           null,
@@ -225,6 +226,7 @@ export default function SessaoApp() {
           loved:        s.loved,
           disliked:     s.disliked,
           shown:        s.shown,
+          epoch:        s.epoch,
           // IDs já vistos: DB + local + current (localAvaliacoes ainda não foi atualizado quando saveRating→recommend são chamados em sequência)
           shownTmdbIds: [
             ...s.historicoDB.map(a => a.tmdb_id),

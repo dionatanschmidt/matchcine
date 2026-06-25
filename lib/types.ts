@@ -22,6 +22,8 @@ export interface Movie {
   cor1: string;
   cor2: string;
   poster_path?: string | null;
+  vote_average?: number;
+  vote_count?: number;
   _fallback?: boolean;
 }
 
@@ -61,6 +63,7 @@ export interface AppState {
   shown: string[];
   watchedCount: number;
   current: Movie | null;
+  epoch: string | null;
   step: number;
   onboardStep: number;
   userId: string | null;
