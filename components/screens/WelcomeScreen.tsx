@@ -3,7 +3,7 @@
 const VERSION = 'v0.1';
 
 interface Props {
-  onStart: () => void;
+  onStart: (mediaType: 'movie' | 'tv') => void;
   onSkip: () => void;
 }
 
@@ -19,13 +19,25 @@ export default function WelcomeScreen({ onStart, onSkip }: Props) {
         O filme certo,<br />sem rolar a<br /><em>noite inteira.</em>
       </h1>
       <p className="sub">
-        Diga como você chega. O MatchCine escolhe{' '}
-        <strong style={{ color: 'var(--ink)' }}>um</strong> filme pro seu
-        momento — e só do que você já assina.
+        Responda 3 perguntas rápidas e descubra o que assistir agora —
+        {' '}filme ou série, só no que você já tem.
       </p>
-      <button className="btn btn-primary" onClick={onStart}>
-        Bora começar
-      </button>
+      <div style={{ display: 'flex', gap: 12 }}>
+        <button
+          className="btn btn-primary"
+          style={{ flex: 1 }}
+          onClick={() => onStart('movie')}
+        >
+          🎬 FILMES
+        </button>
+        <button
+          className="btn btn-primary"
+          style={{ flex: 1 }}
+          onClick={() => onStart('tv')}
+        >
+          📺 SÉRIES
+        </button>
+      </div>
       <button className="skip" onClick={onSkip}>
         Já me conhece? Pular pro filme
       </button>

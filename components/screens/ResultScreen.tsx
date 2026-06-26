@@ -20,9 +20,23 @@ function safeColors(m: Movie, feel: string | null): [string, string] {
   return [c1 ?? f[0], c2 ?? f[1]];
 }
 
+const GENRES = ['Ação', 'Terror', 'Comédia', 'Drama', 'Ficção', 'Romance', 'Suspense', 'Animação', 'Documentário'];
+
+interface EpochOption { id: string | null; label: string; }
+const EPOCH_OPTIONS: EpochOption[] = [
+  { id: null,        label: 'Qualquer época' },
+  { id: 'novo',      label: 'Lançamentos (últimos 3 anos)' },
+  { id: '2010s',     label: 'Anos 2010' },
+  { id: '2000s',     label: 'Anos 2000' },
+  { id: '90s',       label: 'Anos 90' },
+  { id: 'classico',  label: 'Clássicos (antes de 1990)' },
+];
+
 export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao }: Props) {
   const [showSheet, setShowSheet] = useState(false);
   const [showStreamSheet, setShowStreamSheet] = useState(false);
+  const [showGenreSheet, setShowGenreSheet] = useState(false);
+  const [showEpochMenu, setShowEpochMenu] = useState(false);
   const [tempServices, setTempServices] = useState<string[]>([]);
   const m = state.current!;
   const [c1, c2] = safeColors(m, state.ctx.feel);
@@ -37,17 +51,14 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
     onAvaliacao(m, 'nao_curti');
     onRecommend({ opposite: false, disliked: [...state.disliked, m.titulo] });
   };
-  const oppositeOne = () => {
-    onAvaliacao(m, 'nao_curti');
-    onRecommend({ opposite: true, oppositeOf: m.titulo, disliked: [...state.disliked, m.titulo] });
-  };
 
-  const rateWatched = (loved: boolean) => {
+  // Mudança 4: três níveis de veredito
+  const rateWatched = (veredito: 'amei' | 'bom' | 'nao_curti') => {
     setShowSheet(false);
-    onAvaliacao(m, loved ? 'amei' : 'nao_curti');
+    onAvaliacao(m, veredito);
     const overrides: Partial<AppState> = { watchedCount: state.watchedCount + 1 };
-    if (loved) overrides.loved = [...state.loved, m.titulo];
-    else overrides.disliked = [...state.disliked, m.titulo];
+    if (veredito === 'amei') overrides.loved = [...state.loved, m.titulo];
+    else if (veredito === 'nao_curti') overrides.disliked = [...state.disliked, m.titulo];
     onRecommend(overrides);
   };
 
@@ -56,13 +67,15 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
   let onde = m.onde_assistir ?? '';
   if (hasServices && (!onde || /verifique/i.test(onde))) onde = state.services[0];
 
+  const currentEpochLabel = EPOCH_OPTIONS.find(o => o.id === state.epoch)?.label ?? 'Qualquer época';
+
   return (
     <>
       <div className="eyebrow">
         <span>Em cartaz pra você</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button
-            onClick={() => onUpdate({ view: 'context', step: 3 })}
+            onClick={() => onUpdate({ view: 'context', step: 0 })}
             style={{
               background: 'transparent',
               border: '1px solid var(--line)',
@@ -83,44 +96,83 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
       {/* Pôster */}
       <Poster movie={m} c1={c1} c2={c2} emoji={emoji} height={300} />
 
-      {/* Filtro de época */}
-      <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-        {([
-          { id: 'novo',    label: '🆕 Lançamento', bg: '#0d3318', border: '#2a7a42', color: '#6effa0' },
-          { id: '2000s',   label: '📼 Anos 2000',  bg: '#3a1a00', border: '#a04800', color: '#ffb347' },
-          { id: 'classico',label: '🎞️ Clássico',   bg: '#1e0d36', border: '#6b3fa0', color: '#c4a0ff' },
-        ] as const).map(opt => {
-          const active = state.epoch === opt.id;
-          return (
-            <button
-              key={opt.id}
-              onClick={() => {
-                const next = active ? null : opt.id;
-                onRecommend({ epoch: next, opposite: false, shown: [] });
-              }}
-              style={{
-                flex: 1,
-                padding: '7px 4px',
-                fontSize: 12,
-                fontWeight: 600,
-                borderRadius: 10,
-                cursor: 'pointer',
-                border: `1px solid ${active ? opt.border : 'var(--line)'}`,
-                background: active ? opt.bg : 'var(--raised)',
-                color: active ? opt.color : 'var(--muted)',
-                transition: 'all .18s ease',
-              }}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
+      {/* Mudança 5: dropdown de época discreto no canto */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, position: 'relative' }}>
+        <button
+          onClick={() => setShowEpochMenu(v => !v)}
+          style={{
+            background: state.epoch ? 'var(--raised)' : 'transparent',
+            border: '1px solid var(--line)',
+            borderRadius: 20,
+            color: state.epoch ? 'var(--ink)' : 'var(--muted)',
+            padding: '4px 14px',
+            fontSize: 12,
+            cursor: 'pointer',
+            fontWeight: state.epoch ? 600 : 400,
+          }}
+        >
+          {currentEpochLabel} ▾
+        </button>
+        {showEpochMenu && (
+          <>
+            {/* overlay para fechar ao clicar fora */}
+            <div
+              style={{ position: 'fixed', inset: 0, zIndex: 19 }}
+              onClick={() => setShowEpochMenu(false)}
+            />
+            <div style={{
+              position: 'absolute',
+              top: '110%',
+              right: 0,
+              background: 'var(--card-bg, #1a1a2e)',
+              border: '1px solid var(--line)',
+              borderRadius: 10,
+              overflow: 'hidden',
+              zIndex: 20,
+              minWidth: 230,
+              boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+            }}>
+              {EPOCH_OPTIONS.map((opt, i) => (
+                <button
+                  key={String(opt.id)}
+                  onClick={() => {
+                    setShowEpochMenu(false);
+                    onRecommend({ epoch: opt.id, opposite: false, shown: [] });
+                  }}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    padding: '10px 16px',
+                    textAlign: 'left',
+                    background: state.epoch === opt.id ? 'var(--raised)' : 'transparent',
+                    border: 'none',
+                    borderBottom: i < EPOCH_OPTIONS.length - 1 ? '1px solid var(--line)' : 'none',
+                    color: state.epoch === opt.id ? 'var(--ink)' : 'var(--muted)',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    fontWeight: state.epoch === opt.id ? 600 : 400,
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Onde assistir */}
-      {hasServices && inSvc ? (
-        <div className="where in" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>✓ Está no seu <b className="badge">{onde || 'streaming'}</b></span>
+      {/* Mudança 6: botão ⇄ trocar sempre visível quando há serviços */}
+      {hasServices ? (
+        <div
+          className={`where ${inSvc ? 'in' : 'out'}`}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          <span style={{ minWidth: 0, overflow: 'hidden', flex: 1 }}>
+            {inSvc
+              ? <>✓ Está no seu <b className="badge">{onde || 'streaming'}</b></>
+              : <>▸ Fora dos seus streamings — em <b className="badge">{onde || 'outro serviço'}</b></>
+            }
+          </span>
           <button
             onClick={() => { setTempServices([]); setShowStreamSheet(true); }}
             style={{
@@ -133,25 +185,24 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
               cursor: 'pointer',
               flexShrink: 0,
               marginLeft: 8,
+              whiteSpace: 'nowrap',
             }}
           >
             ⇄ trocar
           </button>
         </div>
-      ) : hasServices && !inSvc ? (
-        <div className="where out">▸ <span>Fora dos seus streamings — em <b className="badge">{onde || 'outro serviço'}</b></span></div>
       ) : (
         <div className="where">▸ <span>Onde achar: <b className="badge" style={{ color: 'var(--amber-soft)' }}>{m.onde_assistir || 'verifique a disponibilidade'}</b></span></div>
       )}
 
-      {/* Botões */}
+      {/* Botões — Mudança 3: sem "oposto", com "escolher gênero" */}
       <div style={{ marginTop: 16 }}>
         <button className="btn btn-primary" onClick={loveIt}>Bora, é esse</button>
         <div className="btn-row">
           <button className="btn btn-ghost" onClick={() => setShowSheet(true)}>Já assisti</button>
           <button className="btn btn-ghost" onClick={nextOne}>Mostra outro</button>
         </div>
-        <button className="express" onClick={oppositeOne}>Não é minha vibe — me dá o oposto disso 🔄</button>
+        <button className="express" onClick={() => setShowGenreSheet(true)}>🎬 Escolher por gênero</button>
       </div>
 
       <div className="learn">
@@ -164,16 +215,47 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
         <p className="miss">(sugestão da lista local — TMDB indisponível)</p>
       )}
 
-      {/* Sheet "Já assisti" */}
+      {/* Mudança 4: sheet "Já assisti" com 3 níveis */}
       {showSheet && (
         <div className="sheet">
           <div className="box">
             <h3>E aí, o que achou de <em>{m.titulo}</em>?</h3>
-            <button className="btn btn-primary" onClick={() => rateWatched(true)}>Amei esse</button>
-            <div className="btn-row">
-              <button className="btn btn-ghost" onClick={() => rateWatched(false)}>Não curti muito</button>
+            <button className="btn btn-primary" onClick={() => rateWatched('amei')}>Amei</button>
+            <button className="btn btn-ghost" style={{ marginTop: 8 }} onClick={() => rateWatched('bom')}>Bom filme</button>
+            <div className="btn-row" style={{ marginTop: 8 }}>
+              <button className="btn btn-ghost" onClick={() => rateWatched('nao_curti')}>Não curti muito</button>
               <button className="btn btn-ghost" onClick={() => setShowSheet(false)}>Voltar</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mudança 3: sheet de gênero */}
+      {showGenreSheet && (
+        <div className="sheet">
+          <div className="box">
+            <h3>Escolha um gênero</h3>
+            <div className="genres">
+              {GENRES.map(g => (
+                <button
+                  key={g}
+                  className="gtag"
+                  onClick={() => {
+                    setShowGenreSheet(false);
+                    onRecommend({ ctx: { ...state.ctx, genre: g }, opposite: false, shown: [] });
+                  }}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+            <button
+              className="btn btn-ghost"
+              style={{ marginTop: 16 }}
+              onClick={() => setShowGenreSheet(false)}
+            >
+              Cancelar
+            </button>
           </div>
         </div>
       )}

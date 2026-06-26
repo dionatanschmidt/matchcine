@@ -15,6 +15,7 @@ import SaveNudge       from './SaveNudge';
 
 const initialState: AppState = {
   view:         'welcome',   // nunca force tela de login
+  mediaType:    'movie',
   services:     [],
   likes:        [],
   dislikes:     [],
@@ -227,6 +228,7 @@ export default function SessaoApp() {
           disliked:     s.disliked,
           shown:        s.shown,
           epoch:        s.epoch,
+          mediaType:    s.mediaType,
           // IDs já vistos: DB + local + current (localAvaliacoes ainda não foi atualizado quando saveRating→recommend são chamados em sequência)
           shownTmdbIds: [
             ...s.historicoDB.map(a => a.tmdb_id),
@@ -281,6 +283,7 @@ export default function SessaoApp() {
         endings: s.endings, historicoDB: s.historicoDB,
         loved: dbLoved, disliked: dbDisliked,
         nudgeDismissed: true, view: 'context',
+        mediaType: s.mediaType,
       });
     } else {
       setState(initialState);
@@ -310,7 +313,7 @@ export default function SessaoApp() {
         >
           {state.view === 'welcome' && (
             <WelcomeScreen
-              onStart={() => update({ view: 'onboard', onboardStep: 0 })}
+              onStart={(mediaType) => update({ view: 'onboard', onboardStep: 0, mediaType })}
               onSkip={() => update({ view: 'context', step: 0 })}
             />
           )}

@@ -25,6 +25,7 @@ export interface Movie {
   vote_average?: number;
   vote_count?: number;
   _fallback?: boolean;
+  media_type?: 'movie' | 'tv';
 }
 
 export interface CtxState {
@@ -43,6 +44,7 @@ export interface TasteHistoryEntry {
 
 export interface AppState {
   view: ViewType;
+  mediaType: 'movie' | 'tv';
   services: string[];
   likes: string[];
   dislikes: string[];
