@@ -4,8 +4,9 @@ import type { AppState, Movie } from '@/lib/types';
 import { FALLBACK, OPPOSITE, MOODCOLORS } from '@/lib/data';
 import { supabase, supabaseReady } from '@/lib/supabase';
 import { loadProfile, saveProfile, loadAvaliacoes, saveAvaliacao } from '@/lib/db';
-import { loadLocal, saveLocal, clearLocal, type AnonState } from '@/lib/storage';
+import { loadLocal, saveLocal, clearLocal, getOrCreateDeviceId, incrementLocalDailyCount, type AnonState } from '@/lib/storage';
 import WelcomeScreen   from './screens/WelcomeScreen';
+import LimitScreen     from './screens/LimitScreen';
 import OnboardScreen   from './screens/OnboardScreen';
 import ContextScreen   from './screens/ContextScreen';
 import LoadingScreen   from './screens/LoadingScreen';
@@ -44,6 +45,7 @@ const initialState: AppState = {
   historicoDB:      [],
   localAvaliacoes:  [],
   nudgeDismissed:   false,
+  limitIsLogged:    false,
 };
 
 export default function SessaoApp() {
@@ -211,6 +213,7 @@ export default function SessaoApp() {
     let movie: Movie | null = null;
 
     try {
+      const deviceId = getOrCreateDeviceId();
       const res = await fetch('/api/recommend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -229,6 +232,8 @@ export default function SessaoApp() {
           shown:        s.shown,
           epoch:        s.epoch,
           mediaType:    s.mediaType,
+          userId:       s.userId ?? undefined,
+          deviceId:     s.userId ? undefined : deviceId,
           // IDs já vistos: DB + local + current (localAvaliacoes ainda não foi atualizado quando saveRating→recommend são chamados em sequência)
           shownTmdbIds: [
             ...s.historicoDB.map(a => a.tmdb_id),
@@ -238,7 +243,20 @@ export default function SessaoApp() {
         }),
       });
 
-      if (res.ok) movie = await res.json();
+      if (res.status === 429) {
+        const err = await res.json().catch(() => ({} as Record<string, unknown>));
+        setState(prev => ({
+          ...prev,
+          view:         'limit',
+          limitIsLogged: !!(err as { isLogged?: boolean }).isLogged,
+        }));
+        return;
+      }
+
+      if (res.ok) {
+        movie = await res.json();
+        if (!s.userId) incrementLocalDailyCount();
+      }
     } catch {
       // rede indisponível → fallback
     }
@@ -347,6 +365,12 @@ export default function SessaoApp() {
               state={state}
               onRestart={restartSession}
               onReset={hardReset}
+            />
+          )}
+          {state.view === 'limit' && (
+            <LimitScreen
+              isLogged={state.limitIsLogged}
+              onBack={() => update({ view: 'context' })}
             />
           )}
         </div>

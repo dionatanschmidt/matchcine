@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { supabaseAdmin, adminReady } from '@/lib/supabase-admin';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -64,13 +65,55 @@ const MOOD_COLORS: Record<string, [string, string]> = {
   ligado:    ['#2e1414', '#6b2f2f'],
 };
 
-const PORQUE_MAP: Record<string, string> = {
-  cansado:   'Ideal pra desligar a cabeça — não exige nada, só entrega.',
-  agitado:   'Vai te ajudar a desacelerar sem perceber.',
-  entediado: 'Do tipo que prende do início ao fim.',
-  pra_baixo: 'Vai te fazer sentir — de um jeito bom.',
-  tranquilo: 'Combina com o seu momento aberto de hoje.',
-  ligado:    'Sem freio. Exatamente o que você pediu.',
+// Mapa humor → gêneros preferidos para o motor de regras (sem IA)
+// Usado quando o perfil está vazio (sem favoritos nem histórico de avaliações)
+const MOOD_GENRE_MAP: Record<string, string[]> = {
+  cansado:   ['Comédia', 'Animação'],
+  agitado:   ['Drama'],
+  entediado: ['Ação', 'Suspense', 'Aventura'],
+  pra_baixo: ['Comédia', 'Romance', 'Animação'],
+  tranquilo: [],  // qualquer gênero
+  ligado:    ['Ação', 'Terror'],
+};
+
+// Banco de frases variadas por humor — usadas pelo motor de regras e em cache hits
+const PORQUE_BANK: Record<string, string[]> = {
+  cansado: [
+    'Leve e fácil pra desligar a cabeça.',
+    'Sem esforço, só pra relaxar.',
+    'Perfeito pra quando o cérebro já mandou parar.',
+    'Entra fácil e sai com um sorriso.',
+  ],
+  agitado: [
+    'Vai te ajudar a desacelerar sem perceber.',
+    'Ritmo que convida a respirar fundo.',
+    'Aquele tipo que acalma sem ser chato.',
+    'Pra baixar a guarda e deixar fluir.',
+  ],
+  entediado: [
+    'Do tipo que prende do início ao fim.',
+    'Impossível olhar pro celular no meio.',
+    'Aquela energia que tira você do tédio na hora.',
+    'Envolve e não deixa soltar.',
+  ],
+  pra_baixo: [
+    'Vai te fazer sentir — de um jeito bom.',
+    'Aquele que deixa um sorriso no rosto.',
+    'Reconfortante sem ser piegas.',
+    'Levanta o astral do jeito certo.',
+  ],
+  tranquilo: [
+    'Combina com o seu momento aberto de hoje.',
+    'Uma boa escolha pra qualquer clima.',
+    'Versátil e bem avaliado — vale a pena.',
+    'Exatamente o tipo certo pra agora.',
+  ],
+  ligado: [
+    'Adrenalina pura pra quem topa intensidade.',
+    'Sem freio do início ao fim.',
+    'Intenso exatamente do jeito que você pediu.',
+    'Pra quem quer sentir o coração acelerar.',
+  ],
 };
 
 function formatRuntime(minutes: number): string {
@@ -90,19 +133,145 @@ interface CandidateNorm {
   release_date: string;
 }
 
+// Decide o motor de recomendação.
+// 'regras': perfil vazio — sem favoritos nem histórico de avaliações pessoais.
+//   Escolhe pelo maior rating do TMDB no gênero mapeado ao humor. Sem custo de IA.
+// 'claude': perfil rico — tem favoritos ou histórico que permitem personalização.
+//   Envia candidatos para a Claude Haiku selecionar e justificar.
+function decidirMotor(body: {
+  favorites: string[];
+  likesPick: string[];
+  dislikesPick: string[];
+  loved: string[];
+  disliked: string[];
+}): 'regras' | 'claude' {
+  const temFavoritos = body.favorites.length > 0;
+  const temHistorico =
+    body.likesPick.length > 0 || body.dislikesPick.length > 0 ||
+    body.loved.length > 0    || body.disliked.length > 0;
+  return (temFavoritos || temHistorico) ? 'claude' : 'regras';
+}
+
+// Motor de regras: pega o candidato com maior nota do TMDB que bate com o humor.
+// Sem chamada a IA — usa o banco de frases locais.
+function escolherPorRegras(
+  candidates: CandidateNorm[],
+  feel: string,
+  isTV: boolean
+): { tmdb_id: number; porque: string } {
+  const moodGenres  = MOOD_GENRE_MAP[feel] ?? [];
+  const genreMap    = isTV ? TV_GENRE_IDS : GENRE_IDS;
+  const moodGenreIds = moodGenres.map(g => genreMap[g]).filter(Boolean);
+
+  let pool = moodGenreIds.length > 0
+    ? candidates.filter(c => c.genre_ids.some(id => moodGenreIds.includes(id)))
+    : candidates;
+  if (pool.length === 0) pool = candidates;
+
+  const best = [...pool].sort((a, b) => b.vote_average - a.vote_average)[0];
+  const frases = PORQUE_BANK[feel] ?? PORQUE_BANK['tranquilo'];
+  const porque = frases[Math.floor(Math.random() * frases.length)];
+
+  return { tmdb_id: best.id, porque };
+}
+
+// Gera chave determinística de contexto para o cache.
+// Composta por: mediaType | humor | companhia | fôlego | gênero | época | streamings ordenados
+function gerarChaveContexto(p: {
+  mediaType: string; feel: string; company: string;
+  energy: string; genre: string; epoch: string; services: string[];
+}): string {
+  return [
+    p.mediaType, p.feel || '_', p.company || '_',
+    p.energy || '_', p.genre || '_', p.epoch || '_',
+    [...p.services].sort().join(','),
+  ].join('|');
+}
+
+// Consulta o cache: retorna o primeiro tmdb_id válido não visto pelo usuário.
+// Cache é válido por 7 dias e compartilhado entre todos os usuários.
+async function buscarCache(chave: string, shownIds: number[]): Promise<number | null> {
+  if (!adminReady) return null;
+  const seteDiasAtras = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data } = await supabaseAdmin
+    .from('cache_recomendacoes')
+    .select('filmes')
+    .eq('chave_contexto', chave)
+    .gte('criado_em', seteDiasAtras)
+    .maybeSingle();
+
+  if (!Array.isArray(data?.filmes) || data.filmes.length === 0) return null;
+  return (data.filmes as number[]).find(id => !shownIds.includes(id)) ?? null;
+}
+
+// Adiciona o tmdb_id gerado ao pool de cache para este contexto.
+async function salvarNoCache(chave: string, mediaType: string, tmdbId: number): Promise<void> {
+  if (!adminReady) return;
+
+  const { data } = await supabaseAdmin
+    .from('cache_recomendacoes')
+    .select('filmes')
+    .eq('chave_contexto', chave)
+    .maybeSingle();
+
+  const existentes = Array.isArray(data?.filmes) ? (data.filmes as number[]) : [];
+  if (existentes.includes(tmdbId)) return;
+
+  await supabaseAdmin.from('cache_recomendacoes').upsert(
+    {
+      chave_contexto: chave,
+      media_type:     mediaType,
+      filmes:         [...existentes, tmdbId],
+      criado_em:      new Date().toISOString(),
+    },
+    { onConflict: 'chave_contexto' }
+  );
+}
+
+// Verifica o limite diário sem incrementar (consulta antes de gastar tokens).
+async function verificarLimite(
+  userId?: string,
+  deviceId?: string
+): Promise<{ ok: boolean; isLogged: boolean }> {
+  const isLogged = !!userId;
+  if (!adminReady || (!userId && !deviceId)) return { ok: true, isLogged };
+
+  const hoje  = new Date().toISOString().slice(0, 10);
+  const limite = isLogged ? 20 : 5;
+
+  const { data } = userId
+    ? await supabaseAdmin.from('uso_diario').select('contagem').eq('usuario_id', userId).eq('data', hoje).maybeSingle()
+    : await supabaseAdmin.from('uso_diario').select('contagem').eq('device_id', deviceId!).eq('data', hoje).maybeSingle();
+
+  return { ok: (data?.contagem ?? 0) < limite, isLogged };
+}
+
+// Incrementa a contagem apenas após geração bem-sucedida de recomendação.
+async function incrementarContagem(userId?: string, deviceId?: string): Promise<void> {
+  if (!adminReady || (!userId && !deviceId)) return;
+
+  const hoje = new Date().toISOString().slice(0, 10);
+
+  const { data } = userId
+    ? await supabaseAdmin.from('uso_diario').select('id, contagem').eq('usuario_id', userId).eq('data', hoje).maybeSingle()
+    : await supabaseAdmin.from('uso_diario').select('id, contagem').eq('device_id', deviceId!).eq('data', hoje).maybeSingle();
+
+  if (data?.id) {
+    await supabaseAdmin.from('uso_diario').update({ contagem: (data.contagem ?? 0) + 1 }).eq('id', data.id);
+  } else if (userId) {
+    await supabaseAdmin.from('uso_diario').insert({ usuario_id: userId, data: hoje, contagem: 1 });
+  } else if (deviceId) {
+    await supabaseAdmin.from('uso_diario').insert({ device_id: deviceId, data: hoje, contagem: 1 });
+  }
+}
+
 async function askClaude(
   candidates: CandidateNorm[],
   ctx: {
-    feel?: string;
-    company?: string;
-    energy?: string;
-    genre?: string;
-    endings?: string;
-    favorites?: string[];
-    likesPick?: string[];
-    dislikesPick?: string[];
-    loved?: string[];
-    disliked?: string[];
+    feel?: string; company?: string; energy?: string; genre?: string; endings?: string;
+    favorites?: string[]; likesPick?: string[]; dislikesPick?: string[];
+    loved?: string[]; disliked?: string[];
   },
   isTV = false
 ): Promise<{ tmdb_id_escolhido: number; porque: string } | null> {
@@ -116,8 +285,8 @@ async function askClaude(
 
   const movieList = candidates
     .map(m => {
-      const genres = m.genre_ids.map(id => genreNamesMap[id]).filter(Boolean).join(', ');
-      const year = m.release_date ? new Date(m.release_date).getFullYear() : '?';
+      const genres  = m.genre_ids.map(id => genreNamesMap[id]).filter(Boolean).join(', ');
+      const year    = m.release_date ? new Date(m.release_date).getFullYear() : '?';
       const snippet = m.overview
         ? m.overview.slice(0, 130) + (m.overview.length > 130 ? '…' : '')
         : '';
@@ -153,12 +322,12 @@ Responda APENAS com JSON válido, sem markdown, sem texto extra:
 
   try {
     const msg = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model:      'claude-haiku-4-5-20251001',
       max_tokens: 200,
-      messages: [{ role: 'user', content: prompt }],
+      messages:   [{ role: 'user', content: prompt }],
     });
 
-    const text = msg.content[0].type === 'text' ? msg.content[0].text.trim() : '';
+    const text   = msg.content[0].type === 'text' ? msg.content[0].text.trim() : '';
     const parsed = JSON.parse(text) as { tmdb_id_escolhido: unknown; porque: unknown };
 
     if (typeof parsed.tmdb_id_escolhido === 'number' && typeof parsed.porque === 'string') {
@@ -176,150 +345,128 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'TMDB_API_KEY não configurada.' }, { status: 500 });
   }
 
-  const body = await req.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 });
+  }
+
   const {
-    services = [],
+    services     = [],
     energy,
     genre,
     feel,
-    shown = [],
+    shown        = [],
     shownTmdbIds = [],
     company,
     endings,
-    favorites = [],
-    likesPick = [],
+    favorites    = [],
+    likesPick    = [],
     dislikesPick = [],
-    loved = [],
-    disliked = [],
+    loved        = [],
+    disliked     = [],
     epoch,
-    mediaType = 'movie',
-  } = body;
+    mediaType    = 'movie',
+    userId,
+    deviceId,
+  } = body as {
+    services?: string[]; energy?: string; genre?: string; feel?: string;
+    shown?: string[]; shownTmdbIds?: number[]; company?: string; endings?: string;
+    favorites?: string[]; likesPick?: string[]; dislikesPick?: string[];
+    loved?: string[]; disliked?: string[]; epoch?: string; mediaType?: string;
+    userId?: string; deviceId?: string;
+  };
+
+  // --- Verifica limite de uso antes de qualquer chamada externa ---
+  const { ok: dentroLimite, isLogged } = await verificarLimite(userId, deviceId);
+  if (!dentroLimite) {
+    return NextResponse.json({ error: 'limite_atingido', isLogged }, { status: 429 });
+  }
 
   const isTV = mediaType === 'tv';
+  console.log(`[recommend] mediaType=${mediaType} | shownTmdbIds (${(shownTmdbIds as number[]).length})`);
 
-  console.log(`[recommend] mediaType=${mediaType} shownTmdbIds (${(shownTmdbIds as number[]).length}):`, shownTmdbIds);
-
-  // --- Monta parâmetros do /discover ---
-  const params = new URLSearchParams({
-    api_key:            apiKey,
-    language:           'pt-BR',
-    watch_region:       'BR',
-    'vote_average.gte': '6.5',
-    'vote_count.gte':   '80',
-    sort_by:            'popularity.desc',
+  // --- Chave de cache para este contexto ---
+  const chaveContexto = gerarChaveContexto({
+    mediaType: mediaType ?? 'movie',
+    feel:      feel    ?? '',
+    company:   company ?? '',
+    energy:    energy  ?? '',
+    genre:     genre   ?? '',
+    epoch:     epoch   ?? '',
+    services:  services as string[],
   });
 
-  if (services.length > 0) {
-    const ids = (services as string[]).flatMap(s => PROVIDER_IDS[s] ?? []);
-    if (ids.length > 0) params.set('with_watch_providers', ids.join('|'));
-  }
-
-  // Filtro de duração (diferente para série e filme)
-  if (isTV) {
-    if (energy === 'ep_curto') {
-      params.set('with_runtime.lte', '30');
-    } else if (energy === 'ep_medio') {
-      params.set('with_runtime.gte', '30');
-      params.set('with_runtime.lte', '50');
-    } else if (energy === 'ep_longo') {
-      params.set('with_runtime.gte', '50');
-    }
-  } else {
-    if (energy === 'baixo') params.set('with_runtime.lte', '100');
-  }
-
-  // Filtro de gênero
-  if (genre) {
-    const genreId = isTV ? TV_GENRE_IDS[genre] : GENRE_IDS[genre];
-    if (genreId) params.set('with_genres', String(genreId));
-  }
-
-  // Filtro de época — parâmetros de data diferem entre filme e série
-  const currentYear = new Date().getFullYear();
-  const dateGte = isTV ? 'first_air_date.gte' : 'primary_release_date.gte';
-  const dateLte = isTV ? 'first_air_date.lte' : 'primary_release_date.lte';
-
-  if (epoch === 'novo') {
-    params.set(dateGte, `${currentYear - 3}-01-01`);
-  } else if (epoch === '2010s') {
-    params.set(dateGte, '2010-01-01');
-    params.set(dateLte, '2019-12-31');
-  } else if (epoch === '2000s') {
-    params.set(dateGte, '2000-01-01');
-    params.set(dateLte, '2009-12-31');
-  } else if (epoch === '90s') {
-    params.set(dateGte, '1990-01-01');
-    params.set(dateLte, '1999-12-31');
-  } else if (epoch === 'classico') {
-    params.set(dateLte, '1989-12-31');
-  }
-
   const historyIds = shownTmdbIds as number[];
-  const discoverBase = isTV
-    ? 'https://api.themoviedb.org/3/discover/tv'
-    : 'https://api.themoviedb.org/3/discover/movie';
 
-  const startPage = Math.floor(Math.random() * 3) + 1;
-  const pageOrder = [startPage, ...[1, 2, 3].filter(p => p !== startPage)];
+  // --- Tenta cache antes de chamar TMDB ou Claude ---
+  const cachedId = await buscarCache(chaveContexto, historyIds);
+  let pickedId: number | null = cachedId;
+  let pickedPorque: string | undefined;
 
-  let allDiscovered: CandidateNorm[] = [];
-  let candidates: CandidateNorm[] = [];
-
-  for (const page of pageOrder) {
-    params.set('page', String(page));
-    const res = await fetch(`${discoverBase}?${params}`, { next: { revalidate: 300 } });
-    if (!res.ok) break;
-
-    const data = await res.json();
-    // Normaliza campos de série (name/first_air_date) para o formato unificado
-    const normalized: CandidateNorm[] = (data.results ?? []).map((r: Record<string, unknown>) => ({
-      id:             r.id as number,
-      title:          (isTV ? r.name : r.title) as string,
-      original_title: (isTV ? r.original_name : r.original_title) as string,
-      vote_average:   r.vote_average as number,
-      genre_ids:      r.genre_ids as number[],
-      overview:       r.overview as string,
-      release_date:   (isTV ? r.first_air_date : r.release_date) as string,
-    }));
-
-    allDiscovered = [...allDiscovered, ...normalized];
-
-    const pool = allDiscovered.filter(m => !shown.includes(m.title) && !shown.includes(m.original_title));
-    const sessionFiltered = pool.length > 0 ? pool : allDiscovered;
-    const histFiltered = historyIds.length > 0
-      ? sessionFiltered.filter(m => !historyIds.includes(m.id))
-      : sessionFiltered;
-
-    console.log(`[recommend] página ${page}: ${normalized.length} resultados | histFiltered: ${histFiltered.length} | acumulado: ${allDiscovered.length}`);
-
-    if (histFiltered.length >= 3) {
-      candidates = histFiltered.slice(0, 15);
-      break;
-    }
+  if (cachedId !== null) {
+    console.log(`[recommend] cache hit: tmdb_id=${cachedId}`);
+    const frases = PORQUE_BANK[feel ?? ''] ?? PORQUE_BANK['tranquilo'];
+    pickedPorque = frases[Math.floor(Math.random() * frases.length)];
   }
 
-  if (candidates.length === 0) {
-    const pool = allDiscovered.filter(m => !shown.includes(m.title) && !shown.includes(m.original_title));
-    const sessionFiltered = pool.length > 0 ? pool : allDiscovered;
-    candidates = sessionFiltered.slice(0, 15);
-    console.log(`[recommend] histórico bloqueou todos — filtro removido, usando ${candidates.length} candidatos.`);
-  }
-
-  if (candidates.length === 0) {
-    console.log('[recommend] zero candidatos — buscando sem filtros restritivos');
-    const fallbackParams = new URLSearchParams({
+  // --- Sem cache: descobre candidatos no TMDB e escolhe via motor ---
+  if (pickedId === null) {
+    const params = new URLSearchParams({
       api_key:            apiKey,
       language:           'pt-BR',
       watch_region:       'BR',
       'vote_average.gte': '6.5',
-      'vote_count.gte':   '200',
+      'vote_count.gte':   '80',
       sort_by:            'popularity.desc',
-      page:               '1',
     });
-    const fallbackRes = await fetch(`${discoverBase}?${fallbackParams}`, { next: { revalidate: 300 } });
-    if (fallbackRes.ok) {
-      const fallbackData = await fallbackRes.json();
-      candidates = ((fallbackData.results ?? []) as Record<string, unknown>[]).slice(0, 15).map(r => ({
+
+    if ((services as string[]).length > 0) {
+      const ids = (services as string[]).flatMap(s => PROVIDER_IDS[s] ?? []);
+      if (ids.length > 0) params.set('with_watch_providers', ids.join('|'));
+    }
+
+    if (isTV) {
+      if (energy === 'ep_curto') params.set('with_runtime.lte', '30');
+      else if (energy === 'ep_medio') { params.set('with_runtime.gte', '30'); params.set('with_runtime.lte', '50'); }
+      else if (energy === 'ep_longo') params.set('with_runtime.gte', '50');
+    } else {
+      if (energy === 'baixo') params.set('with_runtime.lte', '100');
+    }
+
+    if (genre) {
+      const genreId = isTV ? TV_GENRE_IDS[genre] : GENRE_IDS[genre];
+      if (genreId) params.set('with_genres', String(genreId));
+    }
+
+    const currentYear = new Date().getFullYear();
+    const dateGte = isTV ? 'first_air_date.gte' : 'primary_release_date.gte';
+    const dateLte = isTV ? 'first_air_date.lte' : 'primary_release_date.lte';
+
+    if (epoch === 'novo')    params.set(dateGte, `${currentYear - 3}-01-01`);
+    else if (epoch === '2010s') { params.set(dateGte, '2010-01-01'); params.set(dateLte, '2019-12-31'); }
+    else if (epoch === '2000s') { params.set(dateGte, '2000-01-01'); params.set(dateLte, '2009-12-31'); }
+    else if (epoch === '90s')   { params.set(dateGte, '1990-01-01'); params.set(dateLte, '1999-12-31'); }
+    else if (epoch === 'classico') params.set(dateLte, '1989-12-31');
+
+    const discoverBase = isTV
+      ? 'https://api.themoviedb.org/3/discover/tv'
+      : 'https://api.themoviedb.org/3/discover/movie';
+
+    const startPage = Math.floor(Math.random() * 3) + 1;
+    const pageOrder = [startPage, ...[1, 2, 3].filter(p => p !== startPage)];
+
+    let allDiscovered: CandidateNorm[] = [];
+    let candidates: CandidateNorm[] = [];
+
+    for (const page of pageOrder) {
+      params.set('page', String(page));
+      const res = await fetch(`${discoverBase}?${params}`, { next: { revalidate: 300 } });
+      if (!res.ok) break;
+
+      const data = await res.json();
+      const normalized: CandidateNorm[] = (data.results ?? []).map((r: Record<string, unknown>) => ({
         id:             r.id as number,
         title:          (isTV ? r.name : r.title) as string,
         original_title: (isTV ? r.original_name : r.original_title) as string,
@@ -328,73 +475,131 @@ export async function POST(req: NextRequest) {
         overview:       r.overview as string,
         release_date:   (isTV ? r.first_air_date : r.release_date) as string,
       }));
+
+      allDiscovered = [...allDiscovered, ...normalized];
+
+      const pool = allDiscovered.filter(
+        m => !(shown as string[]).includes(m.title) && !(shown as string[]).includes(m.original_title)
+      );
+      const sessionFiltered = pool.length > 0 ? pool : allDiscovered;
+      const histFiltered    = historyIds.length > 0
+        ? sessionFiltered.filter(m => !historyIds.includes(m.id))
+        : sessionFiltered;
+
+      console.log(`[recommend] pg ${page}: ${normalized.length} resultados | histFiltered: ${histFiltered.length}`);
+
+      if (histFiltered.length >= 3) {
+        candidates = histFiltered.slice(0, 15);
+        break;
+      }
     }
+
+    if (candidates.length === 0) {
+      const pool = allDiscovered.filter(
+        m => !(shown as string[]).includes(m.title) && !(shown as string[]).includes(m.original_title)
+      );
+      candidates = (pool.length > 0 ? pool : allDiscovered).slice(0, 15);
+      console.log(`[recommend] histórico bloqueou todos — usando ${candidates.length} candidatos sem filtro de histórico.`);
+    }
+
+    if (candidates.length === 0) {
+      console.log('[recommend] zero candidatos — buscando sem filtros restritivos');
+      const fallbackParams = new URLSearchParams({
+        api_key: apiKey, language: 'pt-BR', watch_region: 'BR',
+        'vote_average.gte': '6.5', 'vote_count.gte': '200',
+        sort_by: 'popularity.desc', page: '1',
+      });
+      const fallbackRes = await fetch(`${discoverBase}?${fallbackParams}`, { next: { revalidate: 300 } });
+      if (fallbackRes.ok) {
+        const fallbackData = await fallbackRes.json();
+        candidates = ((fallbackData.results ?? []) as Record<string, unknown>[]).slice(0, 15).map(r => ({
+          id: r.id as number,
+          title: (isTV ? r.name : r.title) as string,
+          original_title: (isTV ? r.original_name : r.original_title) as string,
+          vote_average: r.vote_average as number,
+          genre_ids:    r.genre_ids as number[],
+          overview:     r.overview as string,
+          release_date: (isTV ? r.first_air_date : r.release_date) as string,
+        }));
+      }
+    }
+
+    if (candidates.length === 0) {
+      return NextResponse.json({ error: 'Nenhum resultado encontrado com esses filtros.' }, { status: 404 });
+    }
+
+    // Decide o motor baseado no perfil do usuário
+    const motor = decidirMotor({ favorites, likesPick, dislikesPick, loved, disliked });
+    console.log(`[recommend] motor=${motor}`);
+
+    if (motor === 'claude') {
+      const claudeChoice = await askClaude(candidates, {
+        feel, company, energy, genre, endings,
+        favorites, likesPick, dislikesPick, loved, disliked,
+      }, isTV);
+      if (claudeChoice && candidates.some(m => m.id === claudeChoice.tmdb_id_escolhido)) {
+        pickedId     = claudeChoice.tmdb_id_escolhido;
+        pickedPorque = claudeChoice.porque;
+      }
+    } else {
+      const regrasChoice = escolherPorRegras(candidates, feel ?? 'tranquilo', isTV);
+      pickedId     = regrasChoice.tmdb_id;
+      pickedPorque = regrasChoice.porque;
+    }
+
+    // Fallback para o mais bem avaliado se o motor retornou vazio
+    if (pickedId === null) {
+      pickedId = [...candidates].sort((a, b) => b.vote_average - a.vote_average)[0].id;
+    }
+
+    // Persiste no cache (assíncrono — não bloqueia a resposta)
+    salvarNoCache(chaveContexto, mediaType ?? 'movie', pickedId).catch(() => {});
   }
 
-  if (candidates.length === 0) {
-    return NextResponse.json({ error: 'Nenhum resultado encontrado com esses filtros.' }, { status: 404 });
-  }
+  const porque = pickedPorque ?? (() => {
+    const frases = PORQUE_BANK[feel ?? ''] ?? PORQUE_BANK['tranquilo'];
+    return frases[Math.floor(Math.random() * frases.length)];
+  })();
 
-  // --- Pede à Claude para escolher ---
-  const claudeChoice = await askClaude(candidates, {
-    feel, company, energy, genre, endings,
-    favorites, likesPick, dislikesPick, loved, disliked,
-  }, isTV);
-
-  let pickedId: number;
-  let claudePorque: string | undefined;
-
-  if (claudeChoice && candidates.some(m => m.id === claudeChoice.tmdb_id_escolhido)) {
-    pickedId = claudeChoice.tmdb_id_escolhido;
-    claudePorque = claudeChoice.porque;
-  } else {
-    pickedId = [...candidates].sort((a, b) => b.vote_average - a.vote_average)[0].id;
-  }
-
-  const pick = candidates.find(m => m.id === pickedId) ?? candidates[0];
-
-  // --- Busca detalhes ---
+  // --- Busca detalhes completos do título escolhido ---
   const detailUrl = isTV
-    ? `https://api.themoviedb.org/3/tv/${pick.id}?api_key=${apiKey}&language=pt-BR&append_to_response=watch/providers`
-    : `https://api.themoviedb.org/3/movie/${pick.id}?api_key=${apiKey}&language=pt-BR&append_to_response=watch/providers`;
+    ? `https://api.themoviedb.org/3/tv/${pickedId}?api_key=${apiKey}&language=pt-BR&append_to_response=watch/providers`
+    : `https://api.themoviedb.org/3/movie/${pickedId}?api_key=${apiKey}&language=pt-BR&append_to_response=watch/providers`;
 
   const detailRes = await fetch(detailUrl, { next: { revalidate: 3600 } });
-
   if (!detailRes.ok) {
     return NextResponse.json({ error: 'Erro ao buscar detalhes.' }, { status: 502 });
   }
 
   const detailJson = await detailRes.json();
   const [cor1, cor2] = MOOD_COLORS[feel ?? ''] ?? ['#241B30', '#19131F'];
-
   const brFlat: TMDBProvider[] = detailJson['watch/providers']?.results?.BR?.flatrate ?? [];
   const matchedService = (services as string[]).find(s =>
     (PROVIDER_IDS[s] ?? []).some(id => brFlat.some((p: TMDBProvider) => p.provider_id === id))
   );
 
-  if (isTV) {
-    const detail = detailJson as TMDBTVDetail;
-    const runTime = detail.episode_run_time?.[0] ?? 0;
-    const duracao = runTime ? `${runTime}min/ep` : '';
-    const onde_assistir = matchedService ?? brFlat[0]?.provider_name ?? 'verifique a disponibilidade';
+  // Incrementa contador após geração bem-sucedida (não bloqueia resposta)
+  incrementarContagem(userId, deviceId).catch(() => {});
 
+  if (isTV) {
+    const detail  = detailJson as TMDBTVDetail;
+    const runTime = detail.episode_run_time?.[0] ?? 0;
     return NextResponse.json({
       tmdb_id:          detail.id,
       titulo:           detail.name,
       titulo_original:  detail.original_name,
       ano:              detail.first_air_date ? new Date(detail.first_air_date).getFullYear() : null,
       genero:           detail.genres?.map(g => g.name).join(', ') ?? '',
-      duracao,
+      duracao:          runTime ? `${runTime}min/ep` : '',
       sinopse:          detail.overview ?? '',
       poster_path:      detail.poster_path ? `https://image.tmdb.org/t/p/w500${detail.poster_path}` : null,
       tagline:          detail.tagline ?? '',
-      porque:           claudePorque ?? PORQUE_MAP[feel ?? ''] ?? 'Uma ótima escolha pro seu momento.',
-      onde_assistir,
+      porque,
+      onde_assistir:    matchedService ?? brFlat[0]?.provider_name ?? 'verifique a disponibilidade',
       no_seu_streaming: !!matchedService,
       vote_average:     detail.vote_average ?? 0,
       vote_count:       detail.vote_count ?? 0,
-      cor1,
-      cor2,
+      cor1, cor2,
       media_type:       'tv',
     });
   } else {
@@ -404,7 +609,6 @@ export async function POST(req: NextRequest) {
       brFlat[0]?.provider_name ??
       detail['watch/providers']?.results?.BR?.rent?.[0]?.provider_name ??
       'verifique a disponibilidade';
-
     return NextResponse.json({
       tmdb_id:          detail.id,
       titulo:           detail.title,
@@ -415,13 +619,12 @@ export async function POST(req: NextRequest) {
       sinopse:          detail.overview ?? '',
       poster_path:      detail.poster_path ? `https://image.tmdb.org/t/p/w500${detail.poster_path}` : null,
       tagline:          detail.tagline ?? '',
-      porque:           claudePorque ?? PORQUE_MAP[feel ?? ''] ?? 'Uma ótima escolha pro seu momento.',
+      porque,
       onde_assistir,
       no_seu_streaming: !!matchedService,
       vote_average:     detail.vote_average ?? 0,
       vote_count:       detail.vote_count ?? 0,
-      cor1,
-      cor2,
+      cor1, cor2,
       media_type:       'movie',
     });
   }

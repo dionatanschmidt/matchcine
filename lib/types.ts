@@ -1,4 +1,4 @@
-export type ViewType = 'auth' | 'welcome' | 'onboard' | 'context' | 'loading' | 'result' | 'done';
+export type ViewType = 'auth' | 'welcome' | 'onboard' | 'context' | 'loading' | 'result' | 'done' | 'limit';
 
 export interface AvaliacaoDB {
   tmdb_id: number;
@@ -73,4 +73,5 @@ export interface AppState {
   historicoDB: AvaliacaoDB[];
   localAvaliacoes: AvaliacaoDB[];
   nudgeDismissed: boolean;
+  limitIsLogged: boolean;
 }
