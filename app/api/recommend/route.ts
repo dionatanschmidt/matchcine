@@ -345,6 +345,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'TMDB_API_KEY não configurada.' }, { status: 500 });
   }
 
+  // --- Autenticação via JWT (Authorization: Bearer <token>) ---
+  let userId: string | null = null;
+  const authHeader = req.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    if (!adminReady) {
+      return NextResponse.json({ error: 'Serviço indisponível.' }, { status: 503 });
+    }
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) {
+      return NextResponse.json({ error: 'Token inválido ou expirado.' }, { status: 401 });
+    }
+    userId = user.id;
+  }
+
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -368,18 +383,22 @@ export async function POST(req: NextRequest) {
     disliked     = [],
     epoch,
     mediaType    = 'movie',
-    userId,
     deviceId,
   } = body as {
     services?: string[]; energy?: string; genre?: string; feel?: string;
     shown?: string[]; shownTmdbIds?: number[]; company?: string; endings?: string;
     favorites?: string[]; likesPick?: string[]; dislikesPick?: string[];
     loved?: string[]; disliked?: string[]; epoch?: string; mediaType?: string;
-    userId?: string; deviceId?: string;
+    deviceId?: string;
   };
 
+  // --- Exige deviceId para usuários anônimos ---
+  if (userId === null && !deviceId) {
+    return NextResponse.json({ error: 'deviceId obrigatório para usuários anônimos.' }, { status: 400 });
+  }
+
   // --- Verifica limite de uso antes de qualquer chamada externa ---
-  const { ok: dentroLimite, isLogged } = await verificarLimite(userId, deviceId);
+  const { ok: dentroLimite, isLogged } = await verificarLimite(userId ?? undefined, deviceId);
   if (!dentroLimite) {
     return NextResponse.json({ error: 'limite_atingido', isLogged }, { status: 429 });
   }
@@ -579,7 +598,7 @@ export async function POST(req: NextRequest) {
   );
 
   // Incrementa contador após geração bem-sucedida (não bloqueia resposta)
-  incrementarContagem(userId, deviceId).catch(() => {});
+  incrementarContagem(userId ?? undefined, deviceId).catch(() => {});
 
   if (isTV) {
     const detail  = detailJson as TMDBTVDetail;

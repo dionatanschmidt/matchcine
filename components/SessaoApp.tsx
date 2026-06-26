@@ -214,9 +214,19 @@ export default function SessaoApp() {
 
     try {
       const deviceId = getOrCreateDeviceId();
+
+      // Autentica via JWT no header — nunca expõe userId no body
+      const reqHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (supabaseReady) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          reqHeaders['Authorization'] = `Bearer ${session.access_token}`;
+        }
+      }
+
       const res = await fetch('/api/recommend', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: reqHeaders,
         body: JSON.stringify({
           services:     s.services,
           energy:       s.ctx.energy,
@@ -232,7 +242,6 @@ export default function SessaoApp() {
           shown:        s.shown,
           epoch:        s.epoch,
           mediaType:    s.mediaType,
-          userId:       s.userId ?? undefined,
           deviceId:     s.userId ? undefined : deviceId,
           // IDs já vistos: DB + local + current (localAvaliacoes ainda não foi atualizado quando saveRating→recommend são chamados em sequência)
           shownTmdbIds: [
