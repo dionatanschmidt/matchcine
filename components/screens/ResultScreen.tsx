@@ -296,7 +296,7 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
                 onRecommend({ services: tempServices, opposite: false, shown: [] });
               }}
             >
-              Buscar novo filme
+              {state.mediaType === 'tv' ? 'Buscar nova série' : 'Buscar novo filme'}
             </button>
             <button className="btn btn-ghost" onClick={() => setShowStreamSheet(false)}>
               Cancelar
@@ -349,7 +349,12 @@ export function Poster({ movie: m, c1, c2, emoji, height }: {
       {m.tagline && <div className="ptag">{m.tagline}</div>}
       <div className="ptitle">{m.titulo}</div>
       <div className="pyear">
-        {[m.ano, m.genero, m.duracao].filter(Boolean).join(' · ')}
+        {[
+          m.ano,
+          m.genero,
+          m.duracao,
+          m.media_type === 'tv' && m.seasons ? `${m.seasons} TEMP.` : null,
+        ].filter(Boolean).join(' · ')}
       </div>
     </div>
   );

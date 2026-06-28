@@ -270,6 +270,7 @@ async function askClaude(
   candidates: CandidateNorm[],
   ctx: {
     feel?: string; company?: string; energy?: string; genre?: string; endings?: string;
+    commitment?: string;
     favorites?: string[]; likesPick?: string[]; dislikesPick?: string[];
     loved?: string[]; disliked?: string[];
   },
@@ -294,14 +295,22 @@ async function askClaude(
     })
     .join('\n');
 
-  const prompt = `Você é um curador de ${mediaWord} especializado em combinar humor, companhia e gênero.
+  const feelLine = isTV
+    ? `- Como está se sentindo: não informado (recomende com base em companhia + compromisso + episódio)`
+    : `- Como está se sentindo: ${ctx.feel ?? '?'}`;
+
+  const prefsLine = isTV
+    ? `- Nível de compromisso: ${ctx.commitment ?? 'qualquer'}`
+    : `- Tipo de final preferido: ${ctx.endings ?? 'sem preferência'}`;
+
+  const prompt = `Você é um curador de ${mediaWord} especializado em combinar perfil, companhia e gênero.
 
 MOMENTO DO USUÁRIO:
-- Como está se sentindo: ${ctx.feel ?? '?'}
+${feelLine}
 - Com quem vai assistir: ${ctx.company ?? '?'}
-- Fôlego/tempo de episódio: ${ctx.energy ?? '?'}
+- Tamanho do episódio: ${ctx.energy ?? '?'}
 - Gênero desejado agora: ${ctx.genre ?? 'sem preferência'}
-- Tipo de final preferido: ${ctx.endings ?? 'sem preferência'}
+${prefsLine}
 - Títulos/nomes que ama (⭐ peso 5): ${ctx.favorites?.join(', ') || '—'}
 - Títulos que curtiu (❤️ peso 2): ${ctx.likesPick?.join(', ') || '—'}
 - Títulos que não curtiu (👎 peso -3): ${ctx.dislikesPick?.join(', ') || '—'}
@@ -310,7 +319,7 @@ MOMENTO DO USUÁRIO:
 
 PESOS DE DECISÃO:
 ⭐ favorito = +5 | ❤️ gostei = +2 | 👎 não curti = -3
-humor + companhia combinados = peso 4 | gênero = peso 3 | fôlego/duração = peso 2
+companhia + compromisso = peso 4 | gênero = peso 3 | duração do episódio = peso 2
 
 ${isTV ? 'SÉRIES' : 'FILMES'} DISPONÍVEIS:
 ${movieList}
@@ -376,6 +385,7 @@ export async function POST(req: NextRequest) {
     shownTmdbIds = [],
     company,
     endings,
+    commitment,
     favorites    = [],
     likesPick    = [],
     dislikesPick = [],
@@ -387,6 +397,7 @@ export async function POST(req: NextRequest) {
   } = body as {
     services?: string[]; energy?: string; genre?: string; feel?: string;
     shown?: string[]; shownTmdbIds?: number[]; company?: string; endings?: string;
+    commitment?: string;
     favorites?: string[]; likesPick?: string[]; dislikesPick?: string[];
     loved?: string[]; disliked?: string[]; epoch?: string; mediaType?: string;
     deviceId?: string;
@@ -447,9 +458,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (isTV) {
-      if (energy === 'ep_curto') params.set('with_runtime.lte', '30');
-      else if (energy === 'ep_medio') { params.set('with_runtime.gte', '30'); params.set('with_runtime.lte', '50'); }
-      else if (energy === 'ep_longo') params.set('with_runtime.gte', '50');
+      if (energy === 'curtinho') params.set('with_runtime.lte', '25');
+      else if (energy === 'padrao') { params.set('with_runtime.gte', '25'); params.set('with_runtime.lte', '55'); }
+      else if (energy === 'longo') params.set('with_runtime.gte', '55');
+      // 'qualquer' → sem filtro de runtime
+      if (commitment === 'mini') params.set('with_type', '2');
     } else {
       if (energy === 'baixo') params.set('with_runtime.lte', '100');
     }
@@ -553,7 +566,7 @@ export async function POST(req: NextRequest) {
 
     if (motor === 'claude') {
       const claudeChoice = await askClaude(candidates, {
-        feel, company, energy, genre, endings,
+        feel, company, energy, genre, endings, commitment,
         favorites, likesPick, dislikesPick, loved, disliked,
       }, isTV);
       if (claudeChoice && candidates.some(m => m.id === claudeChoice.tmdb_id_escolhido)) {
@@ -618,6 +631,7 @@ export async function POST(req: NextRequest) {
       no_seu_streaming: !!matchedService,
       vote_average:     detail.vote_average ?? 0,
       vote_count:       detail.vote_count ?? 0,
+      seasons:          detail.number_of_seasons ?? null,
       cor1, cor2,
       media_type:       'tv',
     });
@@ -679,6 +693,7 @@ interface TMDBTVDetail {
   original_name: string;
   first_air_date: string;
   episode_run_time: number[];
+  number_of_seasons: number;
   overview: string;
   tagline: string;
   poster_path: string | null;

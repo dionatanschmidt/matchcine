@@ -40,6 +40,7 @@ const initialState: AppState = {
   epoch:        null,
   step:         0,
   onboardStep:  0,
+  commitment:   null,
   userId:           null,
   profileLoaded:    false,
   historicoDB:      [],
@@ -234,6 +235,7 @@ export default function SessaoApp() {
           feel:         s.ctx.feel,
           company:      s.ctx.company,
           endings:      s.endings,
+          commitment:   s.commitment,
           favorites:    s.favorites,
           likesPick:    s.likesPick,
           dislikesPick: s.dislikesPick,
@@ -340,7 +342,7 @@ export default function SessaoApp() {
         >
           {state.view === 'welcome' && (
             <WelcomeScreen
-              onStart={(mediaType) => update({ view: 'onboard', onboardStep: 0, mediaType })}
+              onStart={(mediaType) => update({ view: 'onboard', onboardStep: 0, mediaType, tasteInit: false, board: [], tasteQueue: [], tasteHistory: [], commitment: null })}
               onSkip={() => update({ view: 'context', step: 0 })}
             />
           )}

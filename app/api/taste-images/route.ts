@@ -13,7 +13,17 @@ async function fetchImageUrl(item: Item, apiKey: string): Promise<string | null>
       const data = await res.json() as { results?: { poster_path?: string | null }[] };
       const path = data.results?.[0]?.poster_path;
       return path ? `https://image.tmdb.org/t/p/w185${path}` : null;
+    } else if (item.t === 'Série') {
+      const res = await fetch(
+        `https://api.themoviedb.org/3/search/tv?api_key=${apiKey}&language=pt-BR&query=${encodeURIComponent(item.n)}`,
+        { next: { revalidate: 86400 } }
+      );
+      if (!res.ok) return null;
+      const data = await res.json() as { results?: { poster_path?: string | null }[] };
+      const path = data.results?.[0]?.poster_path;
+      return path ? `https://image.tmdb.org/t/p/w185${path}` : null;
     } else {
+      // Diretor, Ator, Atriz, Showrunner
       const res = await fetch(
         `https://api.themoviedb.org/3/search/person?api_key=${apiKey}&query=${encodeURIComponent(item.n)}`,
         { next: { revalidate: 86400 } }

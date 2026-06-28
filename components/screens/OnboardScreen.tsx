@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect, KeyboardEvent } from 'react';
 import type { AppState, TasteHistoryEntry } from '@/lib/types';
-import { SERVICES, POOL, GRAD } from '@/lib/data';
+import { SERVICES, POOL, POOL_TV, GRAD } from '@/lib/data';
 
 interface Props {
   state: AppState;
@@ -14,6 +14,7 @@ const ENOUGH = 6;
 
 export default function OnboardScreen({ state, onUpdate, onFinish, onBack }: Props) {
   const { onboardStep } = state;
+  const isTV = state.mediaType === 'tv';
   const total = 2;
 
   const prog = Array.from({ length: total }, (_, i) => (
@@ -58,13 +59,15 @@ export default function OnboardScreen({ state, onUpdate, onFinish, onBack }: Pro
         <StepTaste state={state} onUpdate={onUpdate} onNext={nextOnboard} />
       )}
       {onboardStep === 1 && (
-        <StepEnding onSelect={onFinish} />
+        isTV
+          ? <StepCommitment onSelect={(val) => { onUpdate({ commitment: val }); onFinish(); }} />
+          : <StepEnding onSelect={onFinish} />
       )}
     </>
   );
 }
 
-/* ---- Step 0: Streamings ---- */
+/* ---- Step 0: Streamings (kept for reference, not used in flow) ---- */
 function StepServices({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p: Partial<AppState>) => void; onNext: () => void }) {
   const toggle = (sv: string) => {
     const i = state.services.indexOf(sv);
@@ -114,21 +117,26 @@ function StepServices({ state, onUpdate, onNext }: { state: AppState; onUpdate: 
   );
 }
 
-/* ---- Step 1: Taste trainer ---- */
+/* ---- Taste trainer ---- */
 type CellAnim = 'idle' | 'chosen-like' | 'chosen-fav' | 'chosen-dislike' | 'leaving';
 
-function initTasteBoard(state: AppState): { board: (number | null)[]; queue: number[] } {
-  const idx = [...Array(POOL.length).keys()];
+function initTasteBoard(
+  state: AppState,
+  pool: typeof POOL
+): { board: (number | null)[]; queue: number[] } {
+  const idx = [...Array(pool.length).keys()];
   for (let i = idx.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [idx[i], idx[j]] = [idx[j], idx[i]];
   }
   const taken = new Set([...state.likesPick, ...state.dislikesPick, ...state.favorites]);
-  const avail = idx.filter(i => !taken.has(POOL[i].n));
+  const avail = idx.filter(i => !taken.has(pool[i].n));
   return { board: avail.slice(0, 9), queue: avail.slice(9) };
 }
 
 function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p: Partial<AppState>) => void; onNext: () => void }) {
+  const pool = state.mediaType === 'tv' ? POOL_TV : POOL;
+
   const [cellAnims, setCellAnims] = useState<CellAnim[]>(Array(9).fill('idle'));
   const [isAnimating, setIsAnimating] = useState(false);
   const [images, setImages] = useState<Record<number, string>>({});
@@ -138,24 +146,23 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
     fetch('/api/taste-images', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: POOL.map(item => ({ n: item.n, t: item.t })) }),
+      body: JSON.stringify({ items: pool.map(item => ({ n: item.n, t: item.t })) }),
     })
       .then(r => r.json())
       .then((data: Record<string, string>) => {
         const byIdx: Record<number, string> = {};
-        POOL.forEach((item, i) => { if (data[item.n]) byIdx[i] = data[item.n]; });
+        pool.forEach((item, i) => { if (data[item.n]) byIdx[i] = data[item.n]; });
         setImages(byIdx);
       })
       .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Initialize taste board on first render
   const boardRef = useRef<{ board: (number | null)[]; queue: number[]; history: TasteHistoryEntry[] } | null>(null);
   if (!boardRef.current) {
     if (state.tasteInit) {
       boardRef.current = { board: [...state.board], queue: [...state.tasteQueue], history: [...state.tasteHistory] };
     } else {
-      const { board, queue } = initTasteBoard(state);
+      const { board, queue } = initTasteBoard(state, pool);
       boardRef.current = { board, queue, history: [] };
       onUpdate({ board, tasteQueue: queue, tasteHistory: [], tasteInit: true });
     }
@@ -171,7 +178,7 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
     const idx = board[cell];
     if (idx == null) return;
 
-    const name = POOL[idx].n;
+    const name = pool[idx].n;
     const replacement = queue.length ? queue.shift()! : null;
     const entry: TasteHistoryEntry = { cell, idx, verdict, replacedWith: replacement ?? null };
     history.push(entry);
@@ -200,7 +207,7 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
   const undo = () => {
     if (isAnimating || !history.length) return;
     const h = history.pop()!;
-    const name = POOL[h.idx].n;
+    const name = pool[h.idx].n;
     if (h.replacedWith != null) queue.unshift(h.replacedWith);
     board[h.cell] = h.idx;
     if (h.verdict === 'like') {
@@ -260,43 +267,43 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
           </button>
         )}
         <div className="t9grid">
-        {Array.from({ length: 9 }, (_, cell) => {
-          const idx = board[cell];
-          if (idx == null) return <div key={cell} className="t9card empty" />;
-          const item = POOL[idx];
-          const grad = GRAD[idx % GRAD.length];
-          const anim = cellAnims[cell];
-          return (
-            <div key={cell} className={`t9card${anim !== 'idle' ? ` ${anim}` : ''}`}>
-              <div className="t9art" style={{ background: `linear-gradient(150deg, ${grad[0]}, ${grad[1]})` }}>
-                {images[idx] && (
-                  <img
-                    src={images[idx]}
-                    alt={item.n}
-                    loading="lazy"
-                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                )}
-                <span className="t9stamp s-dislike">👎</span>
-                <span className="t9stamp s-like">❤️</span>
-                <span className="t9stamp s-fav">⭐</span>
-                <div className="t9type">{item.t}</div>
-                <div className="t9name">{item.n}</div>
+          {Array.from({ length: 9 }, (_, cell) => {
+            const idx = board[cell];
+            if (idx == null) return <div key={cell} className="t9card empty" />;
+            const item = pool[idx];
+            const grad = GRAD[idx % GRAD.length];
+            const anim = cellAnims[cell];
+            return (
+              <div key={cell} className={`t9card${anim !== 'idle' ? ` ${anim}` : ''}`}>
+                <div className="t9art" style={{ background: `linear-gradient(150deg, ${grad[0]}, ${grad[1]})` }}>
+                  {images[idx] && (
+                    <img
+                      src={images[idx]}
+                      alt={item.n}
+                      loading="lazy"
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  )}
+                  <span className="t9stamp s-dislike">👎</span>
+                  <span className="t9stamp s-like">❤️</span>
+                  <span className="t9stamp s-fav">⭐</span>
+                  <div className="t9type">{item.t}</div>
+                  <div className="t9name">{item.n}</div>
+                </div>
+                <div className="t9acts">
+                  <button className="t9btn b-dislike" onClick={() => rate(cell, 'dislike')} title="Não curti">👎</button>
+                  <button className="t9btn b-like" onClick={() => rate(cell, 'like')} title="Gostei">❤️</button>
+                  <button className="t9btn b-fav" onClick={() => rate(cell, 'fav')} title="Favorito">⭐</button>
+                </div>
               </div>
-              <div className="t9acts">
-                <button className="t9btn b-dislike" onClick={() => rate(cell, 'dislike')} title="Não curti">👎</button>
-                <button className="t9btn b-like" onClick={() => rate(cell, 'like')} title="Gostei">❤️</button>
-                <button className="t9btn b-fav" onClick={() => rate(cell, 'fav')} title="Favorito">⭐</button>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
         </div>
       </div>
       <div className="tcount">
         {rated > 0
           ? <><b>{rated}</b> marcado{rated > 1 ? 's' : ''}{favs ? ` · ⭐ ${favs} favorito${favs > 1 ? 's' : ''}` : ''}</>
-          : ' '}
+          : ' '}
       </div>
       <button
         className={`btn btn-primary${enough ? ' glow' : ''}`}
@@ -305,7 +312,9 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
       >
         {enough ? 'Avançar' : 'Continuar'}
       </button>
-      <div className="flabel" style={{ marginTop: 22 }}>✍️ Quer citar um favorito específico?</div>
+      <div className="flabel" style={{ marginTop: 22 }}>
+        {state.mediaType === 'tv' ? '✍️ Quer citar uma série específica?' : '✍️ Quer citar um favorito específico?'}
+      </div>
       <div className="chipbox" onClick={() => chipRef.current?.focus()}>
         {state.likes.map((t, i) => (
           <span key={i} className="chip">
@@ -315,7 +324,7 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
         ))}
         <input
           ref={chipRef}
-          placeholder="Filme, diretor ou ator…"
+          placeholder={state.mediaType === 'tv' ? 'Série, showrunner ou ator…' : 'Filme, diretor ou ator…'}
           onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
             if (e.key === 'Enter') addChip('likes');
           }}
@@ -326,7 +335,7 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
   );
 }
 
-/* ---- Step 2: Ending ---- */
+/* ---- StepEnding (filmes) ---- */
 function StepEnding({ onSelect }: { onSelect: (endings: string) => void }) {
   return (
     <>
@@ -337,6 +346,22 @@ function StepEnding({ onSelect }: { onSelect: (endings: string) => void }) {
         <EndCard ico="🎀" t="Amarra tudo" c="resolvido, sem pontas soltas" onClick={() => onSelect('resolvido')} />
         <EndCard ico="🔀" t="Me surpreende" c="adoro uma boa reviravolta" onClick={() => onSelect('reviravolta')} />
         <EndCard ico="🤷" t="Tanto faz" c="contanto que seja bom" onClick={() => onSelect('qualquer')} />
+      </div>
+    </>
+  );
+}
+
+/* ---- StepCommitment (séries) ---- */
+function StepCommitment({ onSelect }: { onSelect: (commitment: string) => void }) {
+  return (
+    <>
+      <h1 className="q">Qual o seu nível de <em>compromisso?</em></h1>
+      <p className="sub">Sem certo ou errado, é o seu gosto</p>
+      <div className="cards">
+        <EndCard ico="🎯" t="Vapt-vupt" c="Minissérie, começo, meio e fim rápido" onClick={() => onSelect('mini')} />
+        <EndCard ico="🏔️" t="Longa jornada" c="Várias temporadas, pra morar no universo" onClick={() => onSelect('longa')} />
+        <EndCard ico="🔄" t="Caso da semana" c="Dá pra pular episódio sem se perder" onClick={() => onSelect('procedural')} />
+        <EndCard ico="🤷" t="Tanto faz" c="Contanto que seja boa" onClick={() => onSelect('qualquer')} />
       </div>
     </>
   );

@@ -12,44 +12,53 @@ export default function ContextScreen({ state, onUpdate, onRecommend, onBack }: 
   const { step, ctx } = state;
   const isTV = state.mediaType === 'tv';
 
-  const setCtx = (key: keyof typeof ctx, value: string) => {
-    onUpdate({ ctx: { ...ctx, [key]: value }, step: step + 1 });
-  };
+  const totalSteps = isTV ? 2 : 3;
 
   const handleBack = () => {
     if (step > 0) onUpdate({ step: step - 1 });
     else onBack();
   };
 
-  const prog = [0, 1, 2].map(i => (
+  const prog = Array.from({ length: totalSteps }, (_, i) => (
     <i key={i} className={i <= step ? 'done' : ''} />
   ));
 
+  // Company step shared between TV (step 0) and movie (step 1)
+  const isCompanyStep = (isTV && step === 0) || (!isTV && step === 1);
+  // Energy/episode step: TV step 1 or movie step 2
+  const isEnergyStep = (isTV && step === 1) || (!isTV && step === 2);
+
   let body: React.ReactNode;
 
-  if (step === 0) {
+  if (!isTV && step === 0) {
+    // Movie only: mood/feel step
+    const setCtx = (key: keyof typeof ctx, value: string) => {
+      onUpdate({ ctx: { ...ctx, [key]: value }, step: step + 1 });
+    };
     body = (
       <>
         <h1 className="q">Qual a sua <em>vibe hoje?</em></h1>
         <p className="sub">Me diz como você está agora</p>
         <div className="cards">
-          <FCard v="cansado"   ico="😮‍💨" t="Cansado"            c="quero desligar a cabeça"                       onClick={() => setCtx('feel', 'cansado')} />
-          <FCard v="agitado"   ico="🌀"  t="Agitado, ansioso"   c="preciso desacelerar"                           onClick={() => setCtx('feel', 'agitado')} />
-          <FCard v="entediado" ico="🥱"  t="Entediado"          c="me fisga, por favor"                           onClick={() => setCtx('feel', 'entediado')} />
-          <FCard v="pra_baixo" ico="🌧️" t="Meio pra baixo"     c="algo que me levante ou me deixe sentir"        onClick={() => setCtx('feel', 'pra_baixo')} />
-          <FCard v="tranquilo" ico="🍃"  t="Tranquilo"          c="aberto a qualquer coisa boa"                   onClick={() => setCtx('feel', 'tranquilo')} />
-          <FCard v="ligado"    ico="🔥"  t="A fim de intensidade" c="pode vir pesado"                             onClick={() => setCtx('feel', 'ligado')} />
+          <FCard v="cansado"   ico="😮‍💨" t="Cansado"              c="quero desligar a cabeça"                    onClick={() => setCtx('feel', 'cansado')} />
+          <FCard v="agitado"   ico="🌀"  t="Agitado, ansioso"     c="preciso desacelerar"                        onClick={() => setCtx('feel', 'agitado')} />
+          <FCard v="entediado" ico="🥱"  t="Entediado"            c="me fisga, por favor"                        onClick={() => setCtx('feel', 'entediado')} />
+          <FCard v="pra_baixo" ico="🌧️" t="Meio pra baixo"       c="algo que me levante ou me deixe sentir"     onClick={() => setCtx('feel', 'pra_baixo')} />
+          <FCard v="tranquilo" ico="🍃"  t="Tranquilo"            c="aberto a qualquer coisa boa"                onClick={() => setCtx('feel', 'tranquilo')} />
+          <FCard v="ligado"    ico="🔥"  t="A fim de intensidade" c="pode vir pesado"                            onClick={() => setCtx('feel', 'ligado')} />
         </div>
       </>
     );
-  } else if (step === 1) {
+  } else if (isCompanyStep) {
+    const defaultEnergy = isTV ? 'padrao' : 'medio';
+
     const selectCompany = (value: string) => {
       onUpdate({ ctx: { ...ctx, company: value } });
     };
 
     const goToResult = () => {
       onRecommend({
-        ctx: { ...ctx, energy: ctx.energy || 'medio' },
+        ctx: { ...ctx, energy: ctx.energy || defaultEnergy },
         express: false,
         opposite: false,
         shown: [],
@@ -118,19 +127,20 @@ export default function ContextScreen({ state, onUpdate, onRecommend, onBack }: 
         </div>
       </>
     );
-  } else {
+  } else if (isEnergyStep) {
     const goWithEnergy = (energyVal: string) =>
       onRecommend({ ctx: { ...ctx, energy: energyVal }, express: false, opposite: false, shown: [] });
 
     if (isTV) {
       body = (
         <>
-          <h1 className="q">Tempo de <em>episódio?</em></h1>
-          <p className="sub">Define o ritmo da série pro momento.</p>
+          <h1 className="q">Qual o tamanho do <em>episódio?</em></h1>
+          <p className="sub">Escolhe o ritmo ideal</p>
           <div className="cards">
-            <CCard k="energy" v="ep_curto" ico="⚡"  t="Curto" c="até 30min por episódio"  onClick={() => goWithEnergy('ep_curto')} />
-            <CCard k="energy" v="ep_medio" ico="🎬"  t="Médio" c="30–50min por episódio"   onClick={() => goWithEnergy('ep_medio')} />
-            <CCard k="energy" v="ep_longo" ico="📺"  t="Longo" c="+50min por episódio"     onClick={() => goWithEnergy('ep_longo')} />
+            <CCard k="energy" v="curtinho" ico="⚡"  t="Curtinho (~20 min)" c="Pra almoçar ou relaxar rápido"    onClick={() => goWithEnergy('curtinho')} />
+            <CCard k="energy" v="padrao"   ico="📺"  t="Padrão (~40 min)"   c="O clássico drama ou suspense"     onClick={() => goWithEnergy('padrao')} />
+            <CCard k="energy" v="longo"    ico="🎬"  t="Tamanho de filme (+1h)" c="Produções épicas"            onClick={() => goWithEnergy('longo')} />
+            <CCard k="energy" v="qualquer" ico="🤷"  t="Tanto faz"          c="Qualquer duração"                 onClick={() => goWithEnergy('qualquer')} />
           </div>
         </>
       );
@@ -140,8 +150,8 @@ export default function ContextScreen({ state, onUpdate, onRecommend, onBack }: 
           <h1 className="q">Qual seu nível de <em>energia agora?</em></h1>
           <p className="sub">De algo curto pra deixar rolando a um filme que exige você inteiro.</p>
           <div className="cards">
-            <CCard k="energy" v="baixo" ico="🪫" t="Pouco"  c="algo leve e curto, dá pra mexer no celular"    onClick={() => goWithEnergy('baixo')} />
-            <CCard k="energy" v="medio" ico="🔋" t="Médio"  c="quero curtir, mas sem esforço"                  onClick={() => goWithEnergy('medio')} />
+            <CCard k="energy" v="baixo" ico="🪫" t="Pouco"  c="algo leve e curto, dá pra mexer no celular"      onClick={() => goWithEnergy('baixo')} />
+            <CCard k="energy" v="medio" ico="🔋" t="Médio"  c="quero curtir, mas sem esforço"                    onClick={() => goWithEnergy('medio')} />
             <CCard k="energy" v="alto"  ico="⚡" t="Total"  c="me dá algo denso e longo, presto atenção em tudo" onClick={() => goWithEnergy('alto')} />
           </div>
         </>

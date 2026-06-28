@@ -24,6 +24,7 @@ export interface Movie {
   poster_path?: string | null;
   vote_average?: number;
   vote_count?: number;
+  seasons?: number;
   _fallback?: boolean;
   media_type?: 'movie' | 'tv';
 }
@@ -68,6 +69,7 @@ export interface AppState {
   epoch: string | null;
   step: number;
   onboardStep: number;
+  commitment: string | null;
   userId: string | null;
   profileLoaded: boolean;
   historicoDB: AvaliacaoDB[];
