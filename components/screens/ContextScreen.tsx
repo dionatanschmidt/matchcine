@@ -16,10 +16,6 @@ export default function ContextScreen({ state, onUpdate, onRecommend, onBack }: 
     onUpdate({ ctx: { ...ctx, [key]: value }, step: step + 1 });
   };
 
-  const expressGo = () => {
-    onRecommend({ express: true, opposite: false, shown: [] });
-  };
-
   const handleBack = () => {
     if (step > 0) onUpdate({ step: step - 1 });
     else onBack();
@@ -34,8 +30,8 @@ export default function ContextScreen({ state, onUpdate, onRecommend, onBack }: 
   if (step === 0) {
     body = (
       <>
-        <h1 className="q">Como você chega pro filme <em>hoje?</em></h1>
-        <p className="sub">Me diz como você está agora — eu decido se combino com o clima ou se te levanto.</p>
+        <h1 className="q">Qual a sua <em>vibe hoje?</em></h1>
+        <p className="sub">Me diz como você está agora</p>
         <div className="cards">
           <FCard v="cansado"   ico="😮‍💨" t="Cansado"            c="quero desligar a cabeça"                       onClick={() => setCtx('feel', 'cansado')} />
           <FCard v="agitado"   ico="🌀"  t="Agitado, ansioso"   c="preciso desacelerar"                           onClick={() => setCtx('feel', 'agitado')} />
@@ -47,24 +43,82 @@ export default function ContextScreen({ state, onUpdate, onRecommend, onBack }: 
       </>
     );
   } else if (step === 1) {
+    const selectCompany = (value: string) => {
+      onUpdate({ ctx: { ...ctx, company: value } });
+    };
+
+    const goToResult = () => {
+      onRecommend({
+        ctx: { ...ctx, energy: ctx.energy || 'medio' },
+        express: false,
+        opposite: false,
+        shown: [],
+      });
+    };
+
+    const goToEnergy = () => {
+      onUpdate({ step: step + 1 });
+    };
+
     body = (
       <>
         <h1 className="q">Com quem <em>você está?</em></h1>
         <p className="sub">Muda bastante o que cai bem.</p>
         <div className="cards">
-          <CCard k="company" v="sozinho"      ico="🛋️"        t="Sozinho, no meu canto"      onClick={() => setCtx('company', 'sozinho')} />
-          <CCard k="company" v="dois"         ico="💑"         t="A dois"                     onClick={() => setCtx('company', 'dois')} />
-          <CCard k="company" v="amigos"       ico="🍻"         t="Com amigos"                 onClick={() => setCtx('company', 'amigos')} />
-          <CCard k="company" v="familia_kids" ico="👨‍👩‍👧"  t="Família, com crianças"     onClick={() => setCtx('company', 'familia_kids')} />
-          <CCard k="company" v="familia"      ico="🧑‍🤝‍🧑" t="Família, só gente grande"  onClick={() => setCtx('company', 'familia')} />
+          <CCard k="company" v="sozinho"      ico="🛋️"        t="Sozinho, no meu canto"      selected={ctx.company === 'sozinho'}      onClick={() => selectCompany('sozinho')} />
+          <CCard k="company" v="dois"         ico="💑"         t="A dois"                     selected={ctx.company === 'dois'}         onClick={() => selectCompany('dois')} />
+          <CCard k="company" v="amigos"       ico="🍻"         t="Com amigos"                 selected={ctx.company === 'amigos'}       onClick={() => selectCompany('amigos')} />
+          <CCard k="company" v="familia_kids" ico="👨‍👩‍👧"  t="Família, com crianças"     selected={ctx.company === 'familia_kids'} onClick={() => selectCompany('familia_kids')} />
+          <CCard k="company" v="familia"      ico="🧑‍🤝‍🧑" t="Família, só gente grande"  selected={ctx.company === 'familia'}      onClick={() => selectCompany('familia')} />
         </div>
-        <button className="express" onClick={expressGo}>
-          {isTV ? 'Já chega — me dá a série ⚡' : 'Já chega — me dá o filme ⚡'}
-        </button>
+        <div style={{
+          position: 'sticky',
+          bottom: 0,
+          background: 'var(--bg)',
+          paddingTop: 12,
+          paddingBottom: 4,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}>
+          <button
+            onClick={goToResult}
+            style={{
+              width: '100%',
+              background: '#FFB13C',
+              color: '#13111C',
+              fontWeight: 700,
+              borderRadius: 14,
+              padding: '16px',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 15,
+              fontFamily: 'var(--body)',
+            }}
+          >
+            ✨ Mostrar minha indicação
+          </button>
+          <button
+            onClick={goToEnergy}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: '1px solid var(--line)',
+              color: 'var(--muted)',
+              fontWeight: 400,
+              borderRadius: 14,
+              padding: '14px',
+              cursor: 'pointer',
+              fontSize: 15,
+              fontFamily: 'var(--body)',
+            }}
+          >
+            Continuar refinando a busca →
+          </button>
+        </div>
       </>
     );
   } else {
-    // Step 2: último passo — vai direto para recommend ao selecionar
     const goWithEnergy = (energyVal: string) =>
       onRecommend({ ctx: { ...ctx, energy: energyVal }, express: false, opposite: false, shown: [] });
 
@@ -78,20 +132,18 @@ export default function ContextScreen({ state, onUpdate, onRecommend, onBack }: 
             <CCard k="energy" v="ep_medio" ico="🎬"  t="Médio" c="30–50min por episódio"   onClick={() => goWithEnergy('ep_medio')} />
             <CCard k="energy" v="ep_longo" ico="📺"  t="Longo" c="+50min por episódio"     onClick={() => goWithEnergy('ep_longo')} />
           </div>
-          <button className="express" onClick={expressGo}>Já chega — me dá a série ⚡</button>
         </>
       );
     } else {
       body = (
         <>
-          <h1 className="q">Quanto <em>fôlego</em> você tem?</h1>
+          <h1 className="q">Qual seu nível de <em>energia agora?</em></h1>
           <p className="sub">De algo curto pra deixar rolando a um filme que exige você inteiro.</p>
           <div className="cards">
             <CCard k="energy" v="baixo" ico="🪫" t="Pouco"  c="algo leve e curto, dá pra mexer no celular"    onClick={() => goWithEnergy('baixo')} />
             <CCard k="energy" v="medio" ico="🔋" t="Médio"  c="quero curtir, mas sem esforço"                  onClick={() => goWithEnergy('medio')} />
             <CCard k="energy" v="alto"  ico="⚡" t="Total"  c="me dá algo denso e longo, presto atenção em tudo" onClick={() => goWithEnergy('alto')} />
           </div>
-          <button className="express" onClick={expressGo}>Já chega — me dá o filme ⚡</button>
         </>
       );
     }
@@ -135,9 +187,13 @@ function FCard({ ico, t, c, onClick }: { v: string; ico: string; t: string; c: s
   );
 }
 
-function CCard({ ico, t, c, onClick }: { k: string; v: string; ico: string; t: string; c?: string; onClick: () => void }) {
+function CCard({ ico, t, c, onClick, selected }: { k: string; v: string; ico: string; t: string; c?: string; onClick: () => void; selected?: boolean }) {
   return (
-    <button className="card" onClick={onClick}>
+    <button
+      className="card"
+      onClick={onClick}
+      style={selected ? { borderColor: 'var(--amber)', background: 'var(--raised-2)' } : undefined}
+    >
       <span className="ico">{ico}</span>
       <div>{t}{c && <span className="cap">{c}</span>}</div>
     </button>

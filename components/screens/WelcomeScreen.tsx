@@ -1,6 +1,6 @@
 'use client';
 
-const VERSION = 'v0.1';
+const VERSION = 'v0.4';
 
 interface Props {
   onStart: (mediaType: 'movie' | 'tv') => void;
@@ -16,11 +16,10 @@ export default function WelcomeScreen({ onStart, onSkip }: Props) {
         MatchCine <span className="welcome-ver">{VERSION}</span>
       </div>
       <h1 className="welcome-h1">
-        O filme certo,<br />sem rolar a<br /><em>noite inteira.</em>
+        O play certo,<br />sem rolar a<br /><em>noite inteira.</em>
       </h1>
       <p className="sub">
-        Responda 3 perguntas rápidas e descubra o que assistir agora —
-        {' '}filme ou série, só no que você já tem.
+        Responda algumas perguntas rápidas e descubra o que assistir agora.
       </p>
       <div style={{ display: 'flex', gap: 12 }}>
         <button

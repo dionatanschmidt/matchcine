@@ -14,14 +14,14 @@ const ENOUGH = 6;
 
 export default function OnboardScreen({ state, onUpdate, onFinish, onBack }: Props) {
   const { onboardStep } = state;
-  const total = 3;
+  const total = 2;
 
   const prog = Array.from({ length: total }, (_, i) => (
     <i key={i} className={i <= onboardStep ? 'done' : ''} />
   ));
 
   const nextOnboard = () => {
-    if (onboardStep < 2) onUpdate({ onboardStep: onboardStep + 1 });
+    if (onboardStep < 1) onUpdate({ onboardStep: onboardStep + 1 });
     else onFinish();
   };
 
@@ -55,12 +55,9 @@ export default function OnboardScreen({ state, onUpdate, onFinish, onBack }: Pro
       </div>
       <div className="prog">{prog}</div>
       {onboardStep === 0 && (
-        <StepServices state={state} onUpdate={onUpdate} onNext={nextOnboard} />
-      )}
-      {onboardStep === 1 && (
         <StepTaste state={state} onUpdate={onUpdate} onNext={nextOnboard} />
       )}
-      {onboardStep === 2 && (
+      {onboardStep === 1 && (
         <StepEnding onSelect={onFinish} />
       )}
     </>
@@ -228,19 +225,41 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
 
   return (
     <>
-      <button className="tback" onClick={undo} disabled={!rated || isAnimating}>↩︎ Desfazer</button>
-      <h1 className="q">O que <em>combina</em> com você?</h1>
-      <p className="tleg">
-        Em cada um: <b style={{ color: 'var(--muted)' }}>👎 não curti</b>,{' '}
-        <b style={{ color: 'var(--love)' }}>❤️ gostei</b> ou{' '}
-        <b style={{ color: 'var(--amber-soft)' }}>⭐ favorito</b> (quando você ama demais). A cada escolha, entra outro.
-      </p>
+      <h1 className="q"><em>Calibrando</em> seu gosto</h1>
+      <p className="tleg">👎 não curti   🩷 gostei   ⭐ favorito</p>
       {enough && (
         <div className="tbanner">
           ✅ <b>Já te conheço bem!</b> Pode avançar — ou continue marcando à vontade.
         </div>
       )}
-      <div className="t9grid">
+      <div style={{ position: 'relative' }}>
+        {rated > 0 && (
+          <button
+            onClick={undo}
+            disabled={isAnimating}
+            title="Desfazer"
+            style={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.1)',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 18,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 5,
+              lineHeight: 1,
+            }}
+          >
+            ↩️
+          </button>
+        )}
+        <div className="t9grid">
         {Array.from({ length: 9 }, (_, cell) => {
           const idx = board[cell];
           if (idx == null) return <div key={cell} className="t9card empty" />;
@@ -272,6 +291,7 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
             </div>
           );
         })}
+        </div>
       </div>
       <div className="tcount">
         {rated > 0
@@ -310,8 +330,8 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
 function StepEnding({ onSelect }: { onSelect: (endings: string) => void }) {
   return (
     <>
-      <h1 className="q">Que tipo de final te <em>agrada mais?</em></h1>
-      <p className="sub">Sem certo ou errado — é só o seu jeito de gostar.</p>
+      <h1 className="q">Como você quer <em>sair dessa história?</em></h1>
+      <p className="sub">Sem certo ou errado, é o seu gosto</p>
       <div className="cards">
         <EndCard ico="🌫️" t="Me deixa pensando" c="aberto, ambíguo, fica ecoando" onClick={() => onSelect('aberto')} />
         <EndCard ico="🎀" t="Amarra tudo" c="resolvido, sem pontas soltas" onClick={() => onSelect('resolvido')} />

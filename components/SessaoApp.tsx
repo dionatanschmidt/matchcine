@@ -357,7 +357,7 @@ export default function SessaoApp() {
               state={state}
               onUpdate={update}
               onRecommend={recommend}
-              onBack={() => update({ view: 'onboard', onboardStep: 2 })}
+              onBack={() => update({ view: 'onboard', onboardStep: 1 })}
             />
           )}
           {state.view === 'loading' && <LoadingScreen />}
