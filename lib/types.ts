@@ -39,7 +39,7 @@ export interface CtxState {
 export interface TasteHistoryEntry {
   cell: number;
   idx: number;
-  verdict: 'like' | 'fav' | 'dislike';
+  verdict: 'like' | 'fav' | 'dislike' | 'unseen';
   replacedWith: number | null;
 }
 
@@ -70,6 +70,7 @@ export interface AppState {
   step: number;
   onboardStep: number;
   commitment: string | null;
+  unseen: string[];
   userId: string | null;
   profileLoaded: boolean;
   historicoDB: AvaliacaoDB[];

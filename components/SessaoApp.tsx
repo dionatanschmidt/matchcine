@@ -41,6 +41,7 @@ const initialState: AppState = {
   step:         0,
   onboardStep:  0,
   commitment:   null,
+  unseen:       [],
   userId:           null,
   profileLoaded:    false,
   historicoDB:      [],
@@ -244,6 +245,7 @@ export default function SessaoApp() {
           shown:        s.shown,
           epoch:        s.epoch,
           mediaType:    s.mediaType,
+          unseen:       s.unseen,
           deviceId:     s.userId ? undefined : deviceId,
           // IDs já vistos: DB + local + current (localAvaliacoes ainda não foi atualizado quando saveRating→recommend são chamados em sequência)
           shownTmdbIds: [
@@ -342,7 +344,7 @@ export default function SessaoApp() {
         >
           {state.view === 'welcome' && (
             <WelcomeScreen
-              onStart={(mediaType) => update({ view: 'onboard', onboardStep: 0, mediaType, tasteInit: false, board: [], tasteQueue: [], tasteHistory: [], commitment: null })}
+              onStart={(mediaType) => update({ view: 'onboard', onboardStep: 0, mediaType, tasteInit: false, board: [], tasteQueue: [], tasteHistory: [], commitment: null, unseen: [] })}
               onSkip={() => update({ view: 'context', step: 0 })}
             />
           )}
