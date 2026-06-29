@@ -80,6 +80,7 @@ export default function ContextScreen({ state, onUpdate, onRecommend, onBack }: 
           <CCard k="company" v="familia_kids" ico="👨‍👩‍👧"  t="Família, com crianças"     selected={ctx.company === 'familia_kids'} onClick={() => selectCompany('familia_kids')} />
           <CCard k="company" v="familia"      ico="🧑‍🤝‍🧑" t="Família, só gente grande"  selected={ctx.company === 'familia'}      onClick={() => selectCompany('familia')} />
         </div>
+        {/* Mudança 3: dois blocos lado a lado com hierarquia visual */}
         <div style={{
           position: 'sticky',
           bottom: 0,
@@ -87,13 +88,12 @@ export default function ContextScreen({ state, onUpdate, onRecommend, onBack }: 
           paddingTop: 12,
           paddingBottom: 4,
           display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
+          gap: 12,
         }}>
           <button
             onClick={goToResult}
             style={{
-              width: '100%',
+              flex: '0 0 70%',
               background: '#FFB13C',
               color: '#13111C',
               fontWeight: 700,
@@ -105,24 +105,24 @@ export default function ContextScreen({ state, onUpdate, onRecommend, onBack }: 
               fontFamily: 'var(--body)',
             }}
           >
-            ✨ Mostrar minha indicação
+            ✨ Ver indicação agora
           </button>
           <button
             onClick={goToEnergy}
             style={{
-              width: '100%',
+              flex: 1,
               background: 'transparent',
               border: '1px solid var(--line)',
               color: 'var(--muted)',
               fontWeight: 400,
               borderRadius: 14,
-              padding: '14px',
+              padding: '16px',
               cursor: 'pointer',
-              fontSize: 15,
+              fontSize: 14,
               fontFamily: 'var(--body)',
             }}
           >
-            Continuar refinando a busca →
+            Refinar →
           </button>
         </div>
       </>

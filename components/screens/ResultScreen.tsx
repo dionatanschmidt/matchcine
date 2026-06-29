@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { AppState, Movie } from '@/lib/types';
 import { GENRE_EMOJI, MOODCOLORS, SERVICES } from '@/lib/data';
 
@@ -35,8 +35,14 @@ const EPOCH_OPTIONS: EpochOption[] = [
 export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao }: Props) {
   const [showSheet, setShowSheet] = useState(false);
   const [showStreamSheet, setShowStreamSheet] = useState(false);
-  const [showGenreSheet, setShowGenreSheet] = useState(false);
   const [showEpochMenu, setShowEpochMenu] = useState(false);
+  const [showSinopse, setShowSinopse] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  // Filtros locais no sheet ⚙️ — inicializados ao abrir
+  const [filterGenre, setFilterGenre] = useState<string | null>(null);
+  const [filterCountry, setFilterCountry] = useState<string | null>(null);
+  const [filterSortType, setFilterSortType] = useState<string | null>(null);
+  const [filterCert, setFilterCert] = useState<string | null>(null);
   const [tempServices, setTempServices] = useState<string[]>([]);
   const m = state.current!;
   const [c1, c2] = safeColors(m, state.ctx.feel);
@@ -69,6 +75,28 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
 
   const currentEpochLabel = EPOCH_OPTIONS.find(o => o.id === state.epoch)?.label ?? 'Qualquer época';
 
+  // Inicializa filtros com valores atuais do state ao abrir o sheet
+  useEffect(() => {
+    if (showSettings) {
+      setFilterGenre(state.ctx.genre);
+      setFilterCountry(state.country ?? null);
+      setFilterSortType(state.sortType ?? null);
+      setFilterCert(state.certification ?? null);
+    }
+  }, [showSettings]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const applySettings = () => {
+    setShowSettings(false);
+    onRecommend({
+      ctx: { ...state.ctx, genre: filterGenre },
+      country: filterCountry,
+      sortType: filterSortType,
+      certification: filterCert,
+      opposite: false,
+      shown: [],
+    });
+  };
+
   return (
     <>
       <div className="eyebrow">
@@ -96,8 +124,18 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
       {/* Pôster */}
       <Poster movie={m} c1={c1} c2={c2} emoji={emoji} height={300} />
 
-      {/* Mudança 5: dropdown de época discreto no canto */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, position: 'relative' }}>
+      {/* Mudança 5: dropdown de época + botão Sinopse lado a lado */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, position: 'relative', gap: 8 }}>
+        {/* Botão Sinopse — pill esquerdo */}
+        {m.sinopse && (
+          <button
+            onClick={() => setShowSinopse(true)}
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--line)', borderRadius: 20, padding: '6px 14px', fontSize: 12, color: 'var(--muted)', cursor: 'pointer', fontFamily: 'var(--body)', flexShrink: 0 }}
+          >
+            Sinopse
+          </button>
+        )}
+        <div style={{ flex: 1 }} />
         <button
           onClick={() => setShowEpochMenu(v => !v)}
           style={{
@@ -109,6 +147,7 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
             fontSize: 12,
             cursor: 'pointer',
             fontWeight: state.epoch ? 600 : 400,
+            flexShrink: 0,
           }}
         >
           {currentEpochLabel} ▾
@@ -167,7 +206,7 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
           className={`where ${inSvc ? 'in' : 'out'}`}
           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
         >
-          <span style={{ minWidth: 0, overflow: 'hidden', flex: 1 }}>
+          <span style={{ minWidth: 0, overflow: 'hidden', flex: 1, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
             {inSvc
               ? <>✓ Está no seu <b className="badge">{onde || 'streaming'}</b></>
               : <>▸ Fora dos seus streamings — em <b className="badge">{onde || 'outro serviço'}</b></>
@@ -195,14 +234,18 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
         <div className="where">▸ <span>Onde achar: <b className="badge" style={{ color: 'var(--amber-soft)' }}>{m.onde_assistir || 'verifique a disponibilidade'}</b></span></div>
       )}
 
-      {/* Botões — Mudança 3: sem "oposto", com "escolher gênero" */}
+      {/* Botões — Mudança 6+7 */}
       <div style={{ marginTop: 16 }}>
-        <button className="btn btn-primary" onClick={loveIt}>Bora, é esse</button>
-        <div className="btn-row">
-          <button className="btn btn-ghost" onClick={() => setShowSheet(true)}>Já assisti</button>
-          <button className="btn btn-ghost" onClick={nextOne}>Mostra outro</button>
+        <button className="btn btn-primary" onClick={loveIt}>{m.media_type === 'tv' ? '✓ Escolhi essa' : '✓ Escolhi esse'}</button>
+        <div className="btn-row" style={{ alignItems: 'center' }}>
+          <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowSheet(true)}>Já assisti</button>
+          <button className="btn btn-ghost" style={{ flex: 1 }} onClick={nextOne}>Mostra outro</button>
+          <button
+            onClick={() => setShowSettings(true)}
+            title="Refinar busca"
+            style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--line)', color: 'var(--muted)', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+          >⚙️</button>
         </div>
-        <button className="express" onClick={() => setShowGenreSheet(true)}>🎬 Escolher por gênero</button>
       </div>
 
       <div className="learn">
@@ -213,6 +256,60 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
 
       {m._fallback && (
         <p className="miss">(sugestão da lista local — TMDB indisponível)</p>
+      )}
+
+      {/* Mudança 8: sheet ⚙️ Refinar busca */}
+      {showSettings && (
+        <div className="sheet">
+          <div className="box">
+            <h3>⚙️ Refinar busca</h3>
+            <FilterRow label="🎬 Gênero">
+              <select value={filterGenre ?? ''} onChange={e => setFilterGenre(e.target.value || null)} style={selectStyle}>
+                <option value="">Qualquer</option>
+                {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </FilterRow>
+            <FilterRow label="🌍 País">
+              <select value={filterCountry ?? ''} onChange={e => setFilterCountry(e.target.value || null)} style={selectStyle}>
+                <option value="">Qualquer</option>
+                <option value="BR">Brasileiro</option>
+                <option value="US">Americano</option>
+                <option value="KR">Coreano</option>
+                <option value="EU">Europeu</option>
+              </select>
+            </FilterRow>
+            <FilterRow label="🔥 Tipo">
+              <select value={filterSortType ?? ''} onChange={e => setFilterSortType(e.target.value || null)} style={selectStyle}>
+                <option value="">Popular</option>
+                <option value="pearl">Pérola escondida</option>
+              </select>
+            </FilterRow>
+            <FilterRow label="🔞 Classificação">
+              <select value={filterCert ?? ''} onChange={e => setFilterCert(e.target.value || null)} style={selectStyle}>
+                <option value="">Sem restrição</option>
+                <option value="L">Livre</option>
+                <option value="14">Até 14 anos</option>
+              </select>
+            </FilterRow>
+            <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={applySettings}>
+              Aplicar e buscar novo
+            </button>
+            <button className="btn btn-ghost" style={{ marginTop: 8 }} onClick={() => setShowSettings(false)}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Mudança 5: sheet de sinopse */}
+      {showSinopse && (
+        <div className="sheet">
+          <div className="box">
+            <h3><em>{m.titulo}</em></h3>
+            <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--muted)', marginBottom: 16 }}>{m.sinopse}</p>
+            <button className="btn btn-ghost" onClick={() => setShowSinopse(false)}>Fechar</button>
+          </div>
+        </div>
       )}
 
       {/* Mudança 4: sheet "Já assisti" com 3 níveis */}
@@ -230,35 +327,6 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
         </div>
       )}
 
-      {/* Mudança 3: sheet de gênero */}
-      {showGenreSheet && (
-        <div className="sheet">
-          <div className="box">
-            <h3>Escolha um gênero</h3>
-            <div className="genres">
-              {GENRES.map(g => (
-                <button
-                  key={g}
-                  className="gtag"
-                  onClick={() => {
-                    setShowGenreSheet(false);
-                    onRecommend({ ctx: { ...state.ctx, genre: g }, opposite: false, shown: [] });
-                  }}
-                >
-                  {g}
-                </button>
-              ))}
-            </div>
-            <button
-              className="btn btn-ghost"
-              style={{ marginTop: 16 }}
-              onClick={() => setShowGenreSheet(false)}
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Sheet "Trocar streaming" */}
       {showStreamSheet && (
@@ -305,6 +373,27 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
         </div>
       )}
     </>
+  );
+}
+
+const selectStyle: React.CSSProperties = {
+  background: 'var(--raised)',
+  border: '1px solid var(--line)',
+  borderRadius: 8,
+  color: 'var(--ink)',
+  padding: '6px 10px',
+  fontSize: 13,
+  fontFamily: 'var(--body)',
+  cursor: 'pointer',
+  minWidth: 140,
+};
+
+function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 0', borderBottom: '1px solid var(--line)' }}>
+      <span style={{ fontSize: 14, color: 'var(--ink)' }}>{label}</span>
+      {children}
+    </div>
   );
 }
 

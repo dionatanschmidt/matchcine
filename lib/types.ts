@@ -67,6 +67,9 @@ export interface AppState {
   watchedCount: number;
   current: Movie | null;
   epoch: string | null;
+  country: string | null;
+  sortType: string | null;
+  certification: string | null;
   step: number;
   onboardStep: number;
   commitment: string | null;

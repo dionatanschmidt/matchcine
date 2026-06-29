@@ -392,6 +392,9 @@ export async function POST(req: NextRequest) {
     loved        = [],
     disliked     = [],
     epoch,
+    country,
+    sortType,
+    certification,
     mediaType    = 'movie',
     deviceId,
   } = body as {
@@ -399,8 +402,9 @@ export async function POST(req: NextRequest) {
     shown?: string[]; shownTmdbIds?: number[]; company?: string; endings?: string;
     commitment?: string;
     favorites?: string[]; likesPick?: string[]; dislikesPick?: string[];
-    loved?: string[]; disliked?: string[]; epoch?: string; mediaType?: string;
-    deviceId?: string;
+    loved?: string[]; disliked?: string[]; epoch?: string;
+    country?: string; sortType?: string; certification?: string;
+    mediaType?: string; deviceId?: string;
   };
 
   // --- Exige deviceId para usuários anônimos ---
@@ -481,6 +485,22 @@ export async function POST(req: NextRequest) {
     else if (epoch === '2000s') { params.set(dateGte, '2000-01-01'); params.set(dateLte, '2009-12-31'); }
     else if (epoch === '90s')   { params.set(dateGte, '1990-01-01'); params.set(dateLte, '1999-12-31'); }
     else if (epoch === 'classico') params.set(dateLte, '1989-12-31');
+
+    // Filtros adicionais do ⚙️
+    if (country) {
+      params.set('with_origin_country', country === 'EU' ? 'FR|DE|ES|IT|GB' : country);
+    }
+
+    if (sortType === 'pearl') {
+      params.set('sort_by', 'vote_average.desc');
+      params.set('vote_count.lte', '500');
+      params.set('vote_count.gte', '50');
+    }
+
+    if (certification) {
+      params.set('certification_country', 'BR');
+      params.set('certification.lte', certification);
+    }
 
     const discoverBase = isTV
       ? 'https://api.themoviedb.org/3/discover/tv'

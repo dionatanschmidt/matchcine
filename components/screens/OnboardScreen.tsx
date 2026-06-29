@@ -127,6 +127,8 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
 
   // Drag state
   const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
+  // Índice do cartão que está saindo (para evitar flash na transição)
+  const [exitingIdx, setExitingIdx] = useState<number | null>(null);
   // 'idle' | 'exiting-right' | 'exiting-left' | 'exiting-up' | 'exiting-down' | 'returning'
   const [animState, setAnimState] = useState<string>('idle');
   const startRef = useRef({ x: 0, y: 0, t: 0 });
@@ -185,10 +187,11 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
       : dir === 'up' ? 'exiting-up'
       : 'exiting-down';
 
+    setExitingIdx(idx);
     setAnimState(exitState);
     setDrag({ x: 0, y: 0, active: false });
 
-    setTimeout(() => setAnimState('idle'), 320);
+    setTimeout(() => { setAnimState('idle'); setExitingIdx(null); }, 320);
   }, [board, queue, history, pool, state, onUpdate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const trySwipe = useCallback((dx: number, dy: number, vx: number, vy: number) => {
@@ -321,6 +324,9 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
   }
 
   const isExiting = animState.startsWith('exiting');
+  // Mudança 2: índices de exibição separados dos índices lógicos
+  const renderFrontIdx = exitingIdx ?? frontIdx;
+  const renderBackIdx = exitingIdx != null ? frontIdx : backIdx;
 
   // Direction overlay colors/labels
   const overlayMap: Record<string, { color: string; emoji: string; label: string; position: string }> = {
@@ -344,59 +350,33 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
 
       {/* Card stack */}
       <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', marginTop: 8, userSelect: 'none' }}>
-        {/* Back card */}
-        {backIdx != null && !isExiting && (
+        {/* Back card — div único para transição CSS suave (Mudança 2) */}
+        {renderBackIdx != null && (
           <div style={{
             position: 'absolute',
-            top: 8,
+            top: isExiting ? 0 : 8,
             left: '50%',
-            transform: 'translateX(-50%) scale(0.95)',
-            opacity: 0.6,
+            transform: `translateX(-50%) scale(${isExiting ? 1 : 0.95})`,
+            opacity: isExiting ? 1 : 0.6,
             width: '100%',
-            maxWidth: 340,
-            maxHeight: 440,
-            borderRadius: 16,
+            maxWidth: 360,
+            borderRadius: 20,
             overflow: 'hidden',
             pointerEvents: 'none',
-            transition: animState === 'idle' ? 'transform 0.3s ease, opacity 0.3s ease' : 'none',
+            transition: isExiting ? 'transform 0.3s ease, opacity 0.3s ease, top 0.3s ease' : 'none',
           }}>
             <SwipeCard
-              item={pool[backIdx]}
-              image={images[backIdx]}
-              grad={GRAD[backIdx % GRAD.length]}
-              overlay={null}
-              overlayOpacity={0}
-            />
-          </div>
-        )}
-        {/* Back card promotes when front exits */}
-        {backIdx != null && isExiting && (
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: '50%',
-            transform: 'translateX(-50%) scale(1)',
-            opacity: 1,
-            width: '100%',
-            maxWidth: 340,
-            maxHeight: 440,
-            borderRadius: 16,
-            overflow: 'hidden',
-            pointerEvents: 'none',
-            transition: 'transform 0.3s ease, opacity 0.3s ease',
-          }}>
-            <SwipeCard
-              item={pool[backIdx]}
-              image={images[backIdx]}
-              grad={GRAD[backIdx % GRAD.length]}
+              item={pool[renderBackIdx]}
+              image={images[renderBackIdx]}
+              grad={GRAD[renderBackIdx % GRAD.length]}
               overlay={null}
               overlayOpacity={0}
             />
           </div>
         )}
 
-        {/* Front card */}
-        {frontIdx != null ? (
+        {/* Front card — Mudança 1: estilo premium, glow âmbar */}
+        {renderFrontIdx != null ? (
           <div
             ref={cardRef}
             onTouchStart={onTouchStart}
@@ -406,10 +386,10 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
             style={{
               position: 'relative',
               width: '100%',
-              maxWidth: 340,
-              borderRadius: 16,
+              maxWidth: 360,
+              borderRadius: 20,
               overflow: 'hidden',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+              boxShadow: '0 0 20px rgba(255,177,60,0.15), 0 8px 32px rgba(0,0,0,0.5)',
               transform: frontTransform,
               transition: frontTransition,
               cursor: drag.active ? 'grabbing' : 'grab',
@@ -418,70 +398,58 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
             }}
           >
             <SwipeCard
-              item={pool[frontIdx]}
-              image={images[frontIdx]}
-              grad={GRAD[frontIdx % GRAD.length]}
+              item={pool[renderFrontIdx]}
+              image={images[renderFrontIdx]}
+              grad={GRAD[renderFrontIdx % GRAD.length]}
               overlay={activeOverlay}
               overlayOpacity={overlayOpacity}
             />
-            {/* ⭐ absolute on card bottom-right */}
-            <button
-              onMouseDown={e => e.stopPropagation()}
-              onTouchStart={e => e.stopPropagation()}
-              onClick={() => { if (animState === 'idle') performSwipe('fav', 'up'); }}
-              style={{
-                position: 'absolute',
-                bottom: 10,
-                right: 10,
-                width: 44,
-                height: 44,
-                borderRadius: '50%',
-                background: 'rgba(255,177,60,0.18)',
-                border: '1.5px solid rgba(255,177,60,0.5)',
-                fontSize: 20,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                zIndex: 5,
-              }}
-            >
-              ⭐
-            </button>
           </div>
         ) : (
-          <div style={{ width: '100%', maxWidth: 340, height: 380, borderRadius: 16, background: 'var(--raised)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 14 }}>
+          <div style={{ width: '100%', maxWidth: 360, height: 380, borderRadius: 20, background: 'var(--raised)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 14 }}>
             Tudo avaliado!
           </div>
         )}
       </div>
 
-      {/* Action buttons row */}
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16, marginTop: 18 }}>
-        <ActionBtn emoji="👎" color="rgba(255,255,255,0.08)" size={52} onClick={() => { if (animState === 'idle' && frontIdx != null) performSwipe('dislike', 'left'); }} title="Não curti" />
-        <ActionBtn emoji="🤷" color="rgba(255,255,255,0.08)" size={52} onClick={() => { if (animState === 'idle' && frontIdx != null) performSwipe('unseen', 'down'); }} title="Não assisti" />
-        <ActionBtn emoji="❤️" color="rgba(255,92,154,0.15)" size={52} onClick={() => { if (animState === 'idle' && frontIdx != null) performSwipe('like', 'right'); }} title="Gostei" />
+      {/* Mudança 1b: 3 botões circulares — 👎 | ⭐ (destaque) | ❤️ */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20, marginTop: 20 }}>
+        <button
+          onClick={() => { if (animState === 'idle' && renderFrontIdx != null) performSwipe('dislike', 'left'); }}
+          title="Não curti"
+          style={{ width: 60, height: 60, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid var(--line)', fontSize: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+        >👎</button>
+        <button
+          onClick={() => { if (animState === 'idle' && renderFrontIdx != null) performSwipe('fav', 'up'); }}
+          title="Favorito"
+          style={{ width: 72, height: 72, borderRadius: '50%', background: '#FFB13C', border: 'none', fontSize: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, boxShadow: '0 0 16px rgba(255,177,60,0.4)', color: '#13111C' }}
+        >★</button>
+        <button
+          onClick={() => { if (animState === 'idle' && renderFrontIdx != null) performSwipe('like', 'right'); }}
+          title="Gostei"
+          style={{ width: 60, height: 60, borderRadius: '50%', background: 'rgba(255,92,154,0.15)', border: '1px solid #FF5C9A', fontSize: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+        >❤️</button>
       </div>
 
-      {/* Undo button — hidden until first swipe */}
-      <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 10, minHeight: 36 }}>
+      {/* Mudança 1c: pill "Não assisti ainda" */}
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+        <button
+          onClick={() => { if (animState === 'idle' && renderFrontIdx != null) performSwipe('unseen', 'down'); }}
+          disabled={animState !== 'idle' || renderFrontIdx == null}
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--line)', borderRadius: 20, padding: '8px 20px', fontSize: 13, color: 'var(--muted)', cursor: 'pointer', fontFamily: 'var(--body)' }}
+        >
+          Não assisti ainda
+        </button>
+      </div>
+
+      {/* Mudança 1d: ↩️ desfazer 32px, canto esquerdo, abaixo do pill */}
+      <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 8, minHeight: 36 }}>
         {rated > 0 && (
           <button
             onClick={undo}
             disabled={animState !== 'idle'}
             title="Desfazer"
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: '50%',
-              background: 'rgba(255,255,255,0.1)',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: 17,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+            style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             ↩️
           </button>
@@ -554,10 +522,10 @@ function SwipeCard({
       position: 'relative',
       width: '100%',
       aspectRatio: '2/3',
-      maxHeight: 440,
+      maxHeight: 480,
       background: `linear-gradient(150deg, ${grad[0]}, ${grad[1]})`,
       overflow: 'hidden',
-      borderRadius: 16,
+      borderRadius: 20,
     }}>
       {image && (
         <img
