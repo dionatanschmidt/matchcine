@@ -93,7 +93,6 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
       sortType: filterSortType,
       certification: filterCert,
       opposite: false,
-      shown: [],
     });
   };
 
@@ -176,7 +175,7 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
                   key={String(opt.id)}
                   onClick={() => {
                     setShowEpochMenu(false);
-                    onRecommend({ epoch: opt.id, opposite: false, shown: [] });
+                    onRecommend({ epoch: opt.id, opposite: false });
                   }}
                   style={{
                     display: 'block',
@@ -361,7 +360,7 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
               style={{ marginTop: 16 }}
               onClick={() => {
                 setShowStreamSheet(false);
-                onRecommend({ services: tempServices, opposite: false, shown: [] });
+                onRecommend({ services: tempServices, opposite: false });
               }}
             >
               {state.mediaType === 'tv' ? 'Buscar nova série' : 'Buscar novo filme'}

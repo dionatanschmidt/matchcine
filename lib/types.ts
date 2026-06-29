@@ -64,6 +64,7 @@ export interface AppState {
   loved: string[];
   disliked: string[];
   shown: string[];
+  shownIds: number[];
   watchedCount: number;
   current: Movie | null;
   epoch: string | null;

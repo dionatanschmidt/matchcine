@@ -541,7 +541,7 @@ export async function POST(req: NextRequest) {
       console.log(`[recommend] pg ${page}: ${normalized.length} resultados | histFiltered: ${histFiltered.length}`);
 
       if (histFiltered.length >= 3) {
-        candidates = histFiltered.slice(0, 15);
+        candidates = histFiltered.slice(0, 20);
         break;
       }
     }
@@ -550,7 +550,7 @@ export async function POST(req: NextRequest) {
       const pool = allDiscovered.filter(
         m => !(shown as string[]).includes(m.title) && !(shown as string[]).includes(m.original_title)
       );
-      candidates = (pool.length > 0 ? pool : allDiscovered).slice(0, 15);
+      candidates = (pool.length > 0 ? pool : allDiscovered).slice(0, 20);
       console.log(`[recommend] histórico bloqueou todos — usando ${candidates.length} candidatos sem filtro de histórico.`);
     }
 
@@ -564,7 +564,7 @@ export async function POST(req: NextRequest) {
       const fallbackRes = await fetch(`${discoverBase}?${fallbackParams}`, { next: { revalidate: 300 } });
       if (fallbackRes.ok) {
         const fallbackData = await fallbackRes.json();
-        candidates = ((fallbackData.results ?? []) as Record<string, unknown>[]).slice(0, 15).map(r => ({
+        candidates = ((fallbackData.results ?? []) as Record<string, unknown>[]).slice(0, 20).map(r => ({
           id: r.id as number,
           title: (isTV ? r.name : r.title) as string,
           original_title: (isTV ? r.original_name : r.original_title) as string,

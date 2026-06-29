@@ -35,6 +35,7 @@ const initialState: AppState = {
   loved:        [],
   disliked:     [],
   shown:        [],
+  shownIds:     [],
   watchedCount: 0,
   current:      null,
   epoch:        null,
@@ -253,12 +254,13 @@ export default function SessaoApp() {
           mediaType:    s.mediaType,
           unseen:       s.unseen,
           deviceId:     s.userId ? undefined : deviceId,
-          // IDs já vistos: DB + local + current (localAvaliacoes ainda não foi atualizado quando saveRating→recommend são chamados em sequência)
-          shownTmdbIds: [
+          // IDs já vistos: DB + local + session (shownIds acumula todos os filmes exibidos na sessão)
+          shownTmdbIds: [...new Set([
             ...s.historicoDB.map(a => a.tmdb_id),
             ...s.localAvaliacoes.map(a => a.tmdb_id),
             ...(s.current?.tmdb_id !== undefined ? [s.current.tmdb_id] : []),
-          ],
+            ...s.shownIds,
+          ])],
         }),
       });
 
@@ -296,6 +298,7 @@ export default function SessaoApp() {
       view: 'result',
       current: movie!,
       shown: [...prev.shown, movie!.titulo],
+      shownIds: movie!.tmdb_id ? [...new Set([...prev.shownIds, movie!.tmdb_id])] : prev.shownIds,
     }));
   };
 
@@ -303,7 +306,7 @@ export default function SessaoApp() {
     update({
       ctx: { feel: null, company: null, energy: null, genre: null },
       express: false, opposite: false, oppositeOf: null,
-      step: 0, shown: [], view: 'context',
+      step: 0, shown: [], shownIds: [], view: 'context',
     });
 
   // "Recomeçar do zero": preserva perfil se logado
