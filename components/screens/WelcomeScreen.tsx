@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -22,6 +23,16 @@ export default function WelcomeScreen({ onStart, onSkip, userId, userEmail }: Pr
     <>
       <div className="glowblob one" />
       <div className="glowblob two" />
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+        <Image
+          src="/logo-main.png.png"
+          alt="MatchCine"
+          height={100}
+          width={300}
+          style={{ objectFit: 'contain', height: 100, width: 'auto' }}
+          priority
+        />
+      </div>
       <div className="welcome-logo">
         MatchCine <span className="welcome-ver">{VERSION}</span>
       </div>

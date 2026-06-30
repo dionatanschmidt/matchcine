@@ -8,13 +8,14 @@ interface Props {
   onUpdate: (patch: Partial<AppState>) => void;
   onFinish: (endings?: string) => void;
   onBack: () => void;
+  onSkipToResult: () => void;
 }
 
 const ENOUGH = 5;
 const THRESHOLD = 100;
 const VELOCITY_THRESHOLD = 0.5;
 
-export default function OnboardScreen({ state, onUpdate, onFinish, onBack }: Props) {
+export default function OnboardScreen({ state, onUpdate, onFinish, onBack, onSkipToResult }: Props) {
   const { onboardStep } = state;
   const isTV = state.mediaType === 'tv';
   const total = 2;
@@ -58,7 +59,7 @@ export default function OnboardScreen({ state, onUpdate, onFinish, onBack }: Pro
       </div>
       <div className="prog">{prog}</div>
       {onboardStep === 0 && (
-        <StepTaste state={state} onUpdate={onUpdate} onNext={nextOnboard} />
+        <StepTaste state={state} onUpdate={onUpdate} onNext={nextOnboard} onSkipToResult={onSkipToResult} />
       )}
       {onboardStep === 1 && (
         isTV
@@ -93,7 +94,7 @@ function getDir(dx: number, dy: number): SwipeDir {
   return dx > 0 ? 'right' : 'left';
 }
 
-function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p: Partial<AppState>) => void; onNext: () => void }) {
+function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppState; onUpdate: (p: Partial<AppState>) => void; onNext: () => void; onSkipToResult: () => void }) {
   const pool = state.mediaType === 'tv' ? POOL_TV : POOL;
   const [images, setImages] = useState<Record<number, string>>({});
 
@@ -359,7 +360,7 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
             transform: `translateX(-50%) scale(${isExiting ? 1 : 0.95})`,
             opacity: isExiting ? 1 : 0.6,
             width: '100%',
-            maxWidth: 360,
+            maxWidth: 300,
             borderRadius: 20,
             overflow: 'hidden',
             pointerEvents: 'none',
@@ -386,7 +387,7 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
             style={{
               position: 'relative',
               width: '100%',
-              maxWidth: 360,
+              maxWidth: 300,
               borderRadius: 20,
               overflow: 'hidden',
               boxShadow: '0 0 20px rgba(255,177,60,0.15), 0 8px 32px rgba(0,0,0,0.5)',
@@ -406,7 +407,7 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
             />
           </div>
         ) : (
-          <div style={{ width: '100%', maxWidth: 360, height: 380, borderRadius: 20, background: 'var(--raised)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 14 }}>
+          <div style={{ width: '100%', maxWidth: 300, height: 380, borderRadius: 20, background: 'var(--raised)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 14 }}>
             Tudo avaliado!
           </div>
         )}
@@ -463,26 +464,48 @@ function StepTaste({ state, onUpdate, onNext }: { state: AppState; onUpdate: (p:
           : <span style={{ fontSize: 11 }}>← arraste ou use os botões →</span>}
       </div>
 
-      {/* Continue button — fixed styling based on enough */}
-      <button
-        onClick={onNext}
-        style={{
-          width: '100%',
-          marginTop: 14,
-          borderRadius: 14,
-          padding: '16px',
-          fontSize: 15,
-          fontFamily: 'var(--body)',
-          cursor: 'pointer',
-          fontWeight: enough ? 700 : 400,
-          background: enough ? '#FFB13C' : 'transparent',
-          color: enough ? '#13111C' : 'var(--muted)',
-          border: enough ? 'none' : '1.5px dashed var(--line)',
-          transition: 'all 0.3s ease',
-        }}
-      >
-        {enough ? 'Já sei o que você gosta ✨ Continuar' : 'Pular etapa (seguir direto)'}
-      </button>
+      {/* Dois botões lado a lado */}
+      <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+        <button
+          onClick={onSkipToResult}
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            background: '#FFB13C',
+            color: '#13111C',
+            fontWeight: 700,
+            fontSize: 14,
+            borderRadius: 14,
+            padding: '14px 10px',
+            border: 'none',
+            cursor: 'pointer',
+            fontFamily: 'var(--body)',
+          }}
+        >
+          <img src="/logo-icon.png.png" alt="" width={20} height={20} style={{ borderRadius: '50%', objectFit: 'cover' }} />
+          ▶ Ir ao filme
+        </button>
+        <button
+          onClick={onNext}
+          style={{
+            flex: 1,
+            background: 'transparent',
+            color: 'var(--muted)',
+            fontWeight: 400,
+            fontSize: 14,
+            borderRadius: 14,
+            padding: '14px 10px',
+            border: '1px solid var(--line)',
+            cursor: 'pointer',
+            fontFamily: 'var(--body)',
+          }}
+        >
+          Continuar refinando →
+        </button>
+      </div>
 
       <div className="flabel" style={{ marginTop: 22 }}>
         {state.mediaType === 'tv' ? '✍️ Quer citar uma série específica?' : '✍️ Quer citar um favorito específico?'}
@@ -522,7 +545,7 @@ function SwipeCard({
       position: 'relative',
       width: '100%',
       aspectRatio: '2/3',
-      maxHeight: 480,
+      maxHeight: 390,
       background: `linear-gradient(150deg, ${grad[0]}, ${grad[1]})`,
       overflow: 'hidden',
       borderRadius: 20,

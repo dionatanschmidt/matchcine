@@ -8,6 +8,7 @@ interface Props {
   onUpdate: (patch: Partial<AppState>) => void;
   onRecommend: (overrides?: Partial<AppState>) => void;
   onAvaliacao: (movie: Movie, veredito: string) => void;
+  onReset: () => void;
 }
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -32,8 +33,11 @@ const EPOCH_OPTIONS: EpochOption[] = [
   { id: 'classico',  label: 'Clássicos (antes de 1990)' },
 ];
 
-export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao }: Props) {
+const SITE_URL = 'https://matchcine.vercel.app';
+
+export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao, onReset }: Props) {
   const [showSheet, setShowSheet] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
   const [showStreamSheet, setShowStreamSheet] = useState(false);
   const [showEpochMenu, setShowEpochMenu] = useState(false);
   const [showSinopse, setShowSinopse] = useState(false);
@@ -74,6 +78,20 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
   if (hasServices && (!onde || /verifique/i.test(onde))) onde = state.services[0];
 
   const currentEpochLabel = EPOCH_OPTIONS.find(o => o.id === state.epoch)?.label ?? 'Qualquer época';
+
+  const handleShare = async () => {
+    if (!m.tmdb_id) return;
+    const mediaType = m.media_type ?? 'movie';
+    const url = `${SITE_URL}/filme/${m.tmdb_id}${mediaType === 'tv' ? '?type=tv' : ''}`;
+    const text = `Hoje vou assistir "${m.titulo}" 🎬 E você? Descubra o seu filme:`;
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      await navigator.share({ title: m.titulo, text, url }).catch(() => {});
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      await navigator.clipboard.writeText(url).catch(() => {});
+      setToastMsg('Link copiado!');
+      setTimeout(() => setToastMsg(''), 2500);
+    }
+  };
 
   // Inicializa filtros com valores atuais do state ao abrir o sheet
   useEffect(() => {
@@ -199,13 +217,13 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
         )}
       </div>
 
-      {/* Mudança 6: botão ⇄ trocar sempre visível quando há serviços */}
+      {/* Streaming — botão ⇄ trocar sempre visível */}
       {hasServices ? (
         <div
           className={`where ${inSvc ? 'in' : 'out'}`}
-          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+          style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 8 }}
         >
-          <span style={{ minWidth: 0, overflow: 'hidden', flex: 1, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
             {inSvc
               ? <>✓ Está no seu <b className="badge">{onde || 'streaming'}</b></>
               : <>▸ Fora dos seus streamings — em <b className="badge">{onde || 'outro serviço'}</b></>
@@ -213,38 +231,69 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
           </span>
           <button
             onClick={() => { setTempServices([]); setShowStreamSheet(true); }}
-            style={{
-              background: 'transparent',
-              border: '1px solid var(--line)',
-              borderRadius: 6,
-              color: 'var(--muted)',
-              padding: '2px 8px',
-              fontSize: 12,
-              cursor: 'pointer',
-              flexShrink: 0,
-              marginLeft: 8,
-              whiteSpace: 'nowrap',
-            }}
+            style={{ background: 'transparent', border: '1px solid var(--line)', borderRadius: 6, color: 'var(--muted)', padding: '2px 8px', fontSize: 12, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
           >
             ⇄ trocar
           </button>
         </div>
       ) : (
-        <div className="where">▸ <span>Onde achar: <b className="badge" style={{ color: 'var(--amber-soft)' }}>{m.onde_assistir || 'verifique a disponibilidade'}</b></span></div>
+        <div className="where" style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 8 }}>
+          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+            ▸ Onde achar: <b className="badge" style={{ color: 'var(--amber-soft)' }}>{m.onde_assistir || 'verifique a disponibilidade'}</b>
+          </span>
+          <button
+            onClick={() => { setTempServices([]); setShowStreamSheet(true); }}
+            style={{ background: 'transparent', border: '1px solid var(--line)', borderRadius: 6, color: 'var(--muted)', padding: '2px 8px', fontSize: 12, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
+          >
+            ⇄ trocar
+          </button>
+        </div>
       )}
 
-      {/* Botões — Mudança 6+7 */}
+      {/* Botões principais */}
       <div style={{ marginTop: 16 }}>
-        <button className="btn btn-primary" onClick={loveIt}>{m.media_type === 'tv' ? '✓ Escolhi essa' : '✓ Escolhi esse'}</button>
-        <div className="btn-row" style={{ alignItems: 'center' }}>
-          <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowSheet(true)}>Já assisti</button>
-          <button className="btn btn-ghost" style={{ flex: 1 }} onClick={nextOne}>Mostra outro</button>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
+          <button
+            onClick={() => setShowSheet(true)}
+            style={{ flex: 1, background: 'rgba(255,255,255,0.08)', border: '1px solid var(--line)', borderRadius: 14, padding: 16, fontSize: 16, fontWeight: 600, color: '#fff', cursor: 'pointer', fontFamily: 'var(--body)' }}
+          >
+            Já assisti
+          </button>
+          <button
+            onClick={nextOne}
+            style={{ flex: 1, background: 'rgba(255,255,255,0.08)', border: '1px solid var(--line)', borderRadius: 14, padding: 16, fontSize: 16, fontWeight: 600, color: '#fff', cursor: 'pointer', fontFamily: 'var(--body)' }}
+          >
+            Mostra outro
+          </button>
           <button
             onClick={() => setShowSettings(true)}
             title="Refinar busca"
-            style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--line)', color: 'var(--muted)', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+            style={{ width: 52, borderRadius: 14, background: 'rgba(255,255,255,0.06)', border: '1px solid var(--line)', color: 'var(--muted)', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
           >⚙️</button>
         </div>
+
+        {/* Botões discretos */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 14 }}>
+          <button
+            onClick={onReset}
+            style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--body)', padding: 0 }}
+          >
+            🔄 Recomeçar a escolha
+          </button>
+          <button
+            onClick={handleShare}
+            style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--body)', padding: 0 }}
+          >
+            📤 Compartilhar
+          </button>
+        </div>
+
+        {/* Toast de confirmação */}
+        {toastMsg && (
+          <div style={{ textAlign: 'center', marginTop: 8, color: 'var(--ok)', fontSize: 13 }}>
+            {toastMsg}
+          </div>
+        )}
       </div>
 
       <div className="learn">

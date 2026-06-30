@@ -5,6 +5,7 @@ import { FALLBACK, OPPOSITE, MOODCOLORS } from '@/lib/data';
 import { supabase, supabaseReady } from '@/lib/supabase';
 import { loadProfile, saveProfile, loadAvaliacoes, saveAvaliacao } from '@/lib/db';
 import { loadLocal, saveLocal, clearLocal, getOrCreateDeviceId, incrementLocalDailyCount, type AnonState } from '@/lib/storage';
+import FloatingLogo    from './FloatingLogo';
 import WelcomeScreen   from './screens/WelcomeScreen';
 import LimitScreen     from './screens/LimitScreen';
 import OnboardScreen   from './screens/OnboardScreen';
@@ -312,6 +313,17 @@ export default function SessaoApp() {
       step: 0, shown: [], shownIds: [], view: 'context',
     });
 
+  const skipToResult = () => {
+    recommend({
+      ctx: {
+        feel:    stateRef.current.ctx.feel    ?? 'tranquilo',
+        company: stateRef.current.ctx.company ?? 'sozinho',
+        energy:  stateRef.current.ctx.energy  ?? 'medio',
+        genre:   stateRef.current.ctx.genre   ?? null,
+      },
+    });
+  };
+
   // "Recomeçar do zero": preserva perfil se logado
   const hardReset = () => {
     const s = stateRef.current;
@@ -368,6 +380,7 @@ export default function SessaoApp() {
               onUpdate={update}
               onFinish={finishOnboard}
               onBack={() => update({ view: 'welcome' })}
+              onSkipToResult={skipToResult}
             />
           )}
           {state.view === 'context' && (
@@ -385,6 +398,7 @@ export default function SessaoApp() {
               onUpdate={update}
               onRecommend={recommend}
               onAvaliacao={saveRating}
+              onReset={hardReset}
             />
           )}
           {state.view === 'done' && state.current && (
@@ -404,6 +418,10 @@ export default function SessaoApp() {
 
         {showNudge && (
           <SaveNudge onDismiss={() => update({ nudgeDismissed: true })} />
+        )}
+
+        {(state.view === 'onboard' || state.view === 'context') && (
+          <FloatingLogo onSkipToResult={skipToResult} />
         )}
       </div>
     </div>
