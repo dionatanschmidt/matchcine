@@ -38,6 +38,7 @@ export default function SaveNudge({ onDismiss }: Props) {
 
   return (
     <div className="save-nudge">
+      <button className="nudge-x" onClick={onDismiss}>×</button>
       <span className="nudge-label">💾 Salvar em qualquer dispositivo?</span>
       <input
         className="nudge-input"
@@ -54,9 +55,8 @@ export default function SaveNudge({ onDismiss }: Props) {
         onClick={handleSend}
         disabled={loading || !email.trim()}
       >
-        {loading ? '…' : '→'}
+        {loading ? 'Enviando…' : 'Salvar →'}
       </button>
-      <button className="nudge-x" onClick={onDismiss}>×</button>
     </div>
   );
 }
