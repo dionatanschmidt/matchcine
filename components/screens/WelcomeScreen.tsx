@@ -27,9 +27,9 @@ export default function WelcomeScreen({ onStart, onSkip, userId, userEmail }: Pr
         <Image
           src="/logo-main.png.png"
           alt="MatchCine"
-          height={100}
+          height={140}
           width={300}
-          style={{ objectFit: 'contain', height: 100, width: 'auto' }}
+          style={{ objectFit: 'contain', height: 140, width: 'auto', maxWidth: 200 }}
           priority
         />
       </div>

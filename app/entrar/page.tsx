@@ -89,8 +89,8 @@ export default function EntrarPage() {
     width: '100%',
     background: 'rgba(255,255,255,0.06)',
     border: '1px solid var(--line)',
-    borderRadius: 12,
-    padding: '14px 16px',
+    borderRadius: 14,
+    padding: '16px',
     color: 'var(--ink)',
     fontSize: 16,
     fontFamily: 'var(--body)',
@@ -179,17 +179,22 @@ export default function EntrarPage() {
 
         {/* Formulário OTP */}
         {step === 'form' ? (
-          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <input
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              placeholder="seu@email.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleSendOtp(); }}
-              style={inputStyle}
-            />
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label style={{ color: 'var(--muted)', fontSize: 13, fontFamily: 'var(--body)' }}>
+                Seu e-mail
+              </label>
+              <input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleSendOtp(); }}
+                style={inputStyle}
+              />
+            </div>
             <button
               onClick={handleSendOtp}
               disabled={loading || !email.trim()}
@@ -198,8 +203,8 @@ export default function EntrarPage() {
                 background: 'transparent',
                 border: '1px solid var(--amber)',
                 color: 'var(--amber)',
-                borderRadius: 12,
-                padding: '14px',
+                borderRadius: 14,
+                padding: '16px',
                 fontSize: 15,
                 fontWeight: 600,
                 fontFamily: 'var(--body)',

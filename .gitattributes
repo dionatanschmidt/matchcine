@@ -1,0 +1,8 @@
+*.png binary
+*.png.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.webp binary
+*.gif binary
+*.svg text eol=lf

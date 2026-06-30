@@ -341,7 +341,7 @@ function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppStat
 
   return (
     <>
-      <h1 className="q"><em>Calibrando</em> seu gosto</h1>
+      <h1 className="q" style={{ marginBottom: 4 }}><em>Calibrando</em> seu gosto</h1>
 
       {enough && (
         <div className="tbanner">
@@ -350,7 +350,7 @@ function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppStat
       )}
 
       {/* Card stack */}
-      <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', marginTop: 8, userSelect: 'none' }}>
+      <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', marginTop: 0, userSelect: 'none' }}>
         {/* Back card — div único para transição CSS suave (Mudança 2) */}
         {renderBackIdx != null && (
           <div style={{
@@ -360,7 +360,7 @@ function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppStat
             transform: `translateX(-50%) scale(${isExiting ? 1 : 0.95})`,
             opacity: isExiting ? 1 : 0.6,
             width: '100%',
-            maxWidth: 300,
+            maxWidth: 270,
             borderRadius: 20,
             overflow: 'hidden',
             pointerEvents: 'none',
@@ -387,7 +387,7 @@ function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppStat
             style={{
               position: 'relative',
               width: '100%',
-              maxWidth: 300,
+              maxWidth: 270,
               borderRadius: 20,
               overflow: 'hidden',
               boxShadow: '0 0 20px rgba(255,177,60,0.15), 0 8px 32px rgba(0,0,0,0.5)',
@@ -407,14 +407,14 @@ function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppStat
             />
           </div>
         ) : (
-          <div style={{ width: '100%', maxWidth: 300, height: 380, borderRadius: 20, background: 'var(--raised)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 14 }}>
+          <div style={{ width: '100%', maxWidth: 270, height: 380, borderRadius: 20, background: 'var(--raised)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 14 }}>
             Tudo avaliado!
           </div>
         )}
       </div>
 
       {/* Mudança 1b: 3 botões circulares — 👎 | ⭐ (destaque) | ❤️ */}
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20, marginTop: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20, marginTop: 10 }}>
         <button
           onClick={() => { if (animState === 'idle' && renderFrontIdx != null) performSwipe('dislike', 'left'); }}
           title="Não curti"
@@ -433,7 +433,7 @@ function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppStat
       </div>
 
       {/* Mudança 1c: pill "Não assisti ainda" */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
         <button
           onClick={() => { if (animState === 'idle' && renderFrontIdx != null) performSwipe('unseen', 'down'); }}
           disabled={animState !== 'idle' || renderFrontIdx == null}
@@ -444,7 +444,7 @@ function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppStat
       </div>
 
       {/* Mudança 1d: ↩️ desfazer 32px, canto esquerdo, abaixo do pill */}
-      <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 8, minHeight: 36 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 4, minHeight: 28 }}>
         {rated > 0 && (
           <button
             onClick={undo}
@@ -458,14 +458,14 @@ function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppStat
       </div>
 
       {/* Counter */}
-      <div className="tcount" style={{ marginTop: 4 }}>
+      <div className="tcount" style={{ marginTop: 2 }}>
         {rated > 0
           ? <><b>{rated}/{total}</b> avaliados{favs ? ` · ⭐ ${favs} favorito${favs > 1 ? 's' : ''}` : ''}</>
           : <span style={{ fontSize: 11 }}>← arraste ou use os botões →</span>}
       </div>
 
       {/* Dois botões lado a lado */}
-      <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+      <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
         <button
           onClick={onSkipToResult}
           style={{
@@ -545,7 +545,7 @@ function SwipeCard({
       position: 'relative',
       width: '100%',
       aspectRatio: '2/3',
-      maxHeight: 390,
+      maxHeight: 350,
       background: `linear-gradient(150deg, ${grad[0]}, ${grad[1]})`,
       overflow: 'hidden',
       borderRadius: 20,
