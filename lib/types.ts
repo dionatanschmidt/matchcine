@@ -76,6 +76,7 @@ export interface AppState {
   commitment: string | null;
   unseen: string[];
   userId: string | null;
+  userEmail: string | null;
   profileLoaded: boolean;
   historicoDB: AvaliacaoDB[];
   localAvaliacoes: AvaliacaoDB[];

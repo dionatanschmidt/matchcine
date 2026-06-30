@@ -47,6 +47,7 @@ const initialState: AppState = {
   commitment:   null,
   unseen:       [],
   userId:           null,
+  userEmail:        null,
   profileLoaded:    false,
   historicoDB:      [],
   localAvaliacoes:  [],
@@ -73,7 +74,7 @@ export default function SessaoApp() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        handleLogin(session.user.id);   // usuário já logado
+        handleLogin(session.user.id, session.user.email ?? null);
       } else {
         const local = loadLocal();
         if (local) applyLocalState(local);  // anônimo com dados salvos
@@ -82,7 +83,7 @@ export default function SessaoApp() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        handleLogin(session.user.id);
+        handleLogin(session.user.id, session.user.email ?? null);
       }
       if (event === 'SIGNED_OUT') {
         setState({ ...initialState });
@@ -133,9 +134,9 @@ export default function SessaoApp() {
   };
 
   // Carrega perfil do Supabase após login (inclusive migração pós-nudge)
-  const handleLogin = async (userId: string) => {
+  const handleLogin = async (userId: string, email?: string | null) => {
     if (stateRef.current.userId === userId) return;
-    update({ userId, view: 'loading' });
+    update({ userId, userEmail: email ?? null, view: 'loading' });
     clearLocal(); // localStorage já migrado pelo callback; limpa de todo jeito
 
     const [profile, avaliacoes] = await Promise.all([
@@ -150,6 +151,7 @@ export default function SessaoApp() {
     if (profile) {
       update({
         userId,
+        userEmail:       email ?? null,
         profileLoaded:   true,
         services:        profile.streamings       ?? [],
         likesPick:       profile.ama              ?? [],
@@ -168,6 +170,7 @@ export default function SessaoApp() {
       // Novo usuário no Supabase: vai para o onboarding
       update({
         userId,
+        userEmail:       email ?? null,
         profileLoaded:   false,
         historicoDB,
         localAvaliacoes: [],
@@ -355,6 +358,8 @@ export default function SessaoApp() {
             <WelcomeScreen
               onStart={(mediaType) => update({ view: 'onboard', onboardStep: 0, mediaType, tasteInit: false, board: [], tasteQueue: [], tasteHistory: [], commitment: null, unseen: [] })}
               onSkip={() => update({ view: 'context', step: 0 })}
+              userId={state.userId}
+              userEmail={state.userEmail}
             />
           )}
           {state.view === 'onboard' && (
