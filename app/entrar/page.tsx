@@ -44,6 +44,7 @@ export default function EntrarPage() {
   const [step, setStep]         = useState<'form' | 'otp'>('form');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
+  const [errorType, setErrorType] = useState<'error' | 'warning'>('error');
 
   const handleGoogle = async () => {
     await supabase.auth.signInWithOAuth({
@@ -57,6 +58,7 @@ export default function EntrarPage() {
     if (!trimmed) return;
     setLoading(true);
     setError('');
+    setErrorType('error');
     const { error: err } = await supabase.auth.signInWithOtp({
       email: trimmed,
       options: { shouldCreateUser: true },
@@ -73,10 +75,11 @@ export default function EntrarPage() {
       } else if (/not confirmed/i.test(msg)) {
         setError('Verifique seu e-mail — já enviamos um código antes.');
       } else {
+        setErrorType('warning');
         setError(
           process.env.NODE_ENV === 'development'
             ? `Erro: ${msg}`
-            : 'Não foi possível enviar o código. Verifique o e-mail e tente novamente.'
+            : 'O código por e-mail está indisponível no momento. Use o login com Google acima, é mais rápido e sempre funciona.'
         );
       }
       return;
@@ -96,6 +99,7 @@ export default function EntrarPage() {
     });
     if (err || !data.session) {
       setLoading(false);
+      setErrorType('error');
       setError('Código inválido ou expirado. Tente novamente.');
       return;
     }
@@ -171,16 +175,27 @@ export default function EntrarPage() {
             fontWeight: 600,
             fontSize: 15,
             borderRadius: 14,
-            padding: '16px',
+            padding: '18px',
             border: 'none',
             cursor: 'pointer',
-            marginBottom: 20,
+            marginBottom: 8,
             fontFamily: 'var(--body)',
           }}
         >
           <GoogleIcon />
           Continuar com Google
         </button>
+
+        {/* Selo de recomendação */}
+        <p style={{
+          color: '#22C55E',
+          fontSize: 11,
+          fontWeight: 600,
+          textAlign: 'center',
+          margin: '0 0 20px',
+        }}>
+          ✓ Recomendado — mais rápido
+        </p>
 
         {/* Separador */}
         <div style={{
@@ -197,10 +212,10 @@ export default function EntrarPage() {
 
         {/* Formulário OTP */}
         {step === 'form' ? (
-          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12, opacity: 0.85 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <label style={{ color: 'var(--muted)', fontSize: 13, fontFamily: 'var(--body)' }}>
-                Seu e-mail
+                Ou use seu e-mail (pode demorar para chegar)
               </label>
               <input
                 type="email"
@@ -284,7 +299,17 @@ export default function EntrarPage() {
 
         {/* Mensagem de erro */}
         {error && (
-          <p style={{ color: 'var(--love)', fontSize: 13, marginTop: 10, textAlign: 'center' }}>
+          <p style={{
+            color: errorType === 'warning' ? 'var(--amber)' : 'var(--love)',
+            fontSize: 13,
+            marginTop: 10,
+            textAlign: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+          }}>
+            {errorType === 'warning' && <span aria-hidden>⚠️</span>}
             {error}
           </p>
         )}
