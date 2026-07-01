@@ -25,6 +25,7 @@ export interface Movie {
   vote_average?: number;
   vote_count?: number;
   seasons?: number;
+  genre_ids?: number[];
   _fallback?: boolean;
   media_type?: 'movie' | 'tv';
 }
@@ -82,4 +83,6 @@ export interface AppState {
   localAvaliacoes: AvaliacaoDB[];
   nudgeDismissed: boolean;
   limitIsLogged: boolean;
+  limitPendingEmail: string | null;
+  recentGenres: number[];
 }

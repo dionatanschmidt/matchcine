@@ -64,3 +64,32 @@ export async function saveAvaliacao(
     // silencioso — não crítico
   }
 }
+
+export interface WatchlistItem {
+  tmdb_id: number;
+  titulo: string;
+  poster_path: string | null;
+  ano: number | null;
+  generos: string | null;
+  streaming: string | null;
+}
+
+export async function addToWatchlist(userId: string, item: WatchlistItem): Promise<void> {
+  try {
+    await supabase.from('watchlist').insert({ usuario_id: userId, ...item });
+  } catch {}
+}
+
+export async function isInWatchlist(userId: string, tmdbId: number): Promise<boolean> {
+  try {
+    const { data } = await supabase
+      .from('watchlist')
+      .select('id')
+      .eq('usuario_id', userId)
+      .eq('tmdb_id', tmdbId)
+      .maybeSingle();
+    return !!data;
+  } catch {
+    return false;
+  }
+}

@@ -37,10 +37,10 @@ export default function WelcomeScreen({ onStart, onSkip, userId, userEmail }: Pr
         MatchCine <span className="welcome-ver">{VERSION}</span>
       </div>
       <h1 className="welcome-h1">
-        O play certo,<br />sem rolar a<br /><em>noite inteira.</em>
+        Escolha seu próximo filme<br />em menos de <em>1 minuto</em>
       </h1>
       <p className="sub">
-        Responda algumas perguntas rápidas e descubra o que assistir agora.
+        Mais de 500 mil títulos de todos os streamings, sem precisar rolar a noite inteira
       </p>
       <div style={{ display: 'flex', gap: 12 }}>
         <button

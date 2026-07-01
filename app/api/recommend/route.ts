@@ -116,6 +116,15 @@ const PORQUE_BANK: Record<string, string[]> = {
   ],
 };
 
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 function formatRuntime(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
@@ -273,6 +282,7 @@ async function askClaude(
     commitment?: string;
     favorites?: string[]; likesPick?: string[]; dislikesPick?: string[];
     loved?: string[]; disliked?: string[];
+    recentGenres?: number[];
   },
   isTV = false
 ): Promise<{ tmdb_id_escolhido: number; porque: string } | null> {
@@ -316,6 +326,7 @@ ${prefsLine}
 - Títulos que não curtiu (👎 peso -3): ${ctx.dislikesPick?.join(', ') || '—'}
 - ${isTV ? 'Séries' : 'Filmes'} amados nesta sessão (❤️ peso 2): ${ctx.loved?.join(', ') || '—'}
 - ${isTV ? 'Séries' : 'Filmes'} rejeitados nesta sessão (👎 peso -3): ${ctx.disliked?.join(', ') || '—'}
+${ctx.recentGenres?.length ? `- Gêneros das últimas recomendações (IDs TMDB, evite repetir): ${ctx.recentGenres.join(', ')}` : ''}
 
 PESOS DE DECISÃO:
 ⭐ favorito = +5 | ❤️ gostei = +2 | 👎 não curti = -3
@@ -323,6 +334,9 @@ companhia + compromisso = peso 4 | gênero = peso 3 | duração do episódio = p
 
 ${isTV ? 'SÉRIES' : 'FILMES'} DISPONÍVEIS:
 ${movieList}
+
+INSTRUÇÃO DE DIVERSIDADE: Priorize DIVERSIDADE de gênero. Se o usuário gosta de ação, considere também aventura, suspense e ficção. Se os gêneros recentes forem repetidos, escolha algo diferente desta vez. Prefira títulos menos óbvios dentro do estilo do usuário.
+INSTRUÇÃO DE LINGUAGEM: NUNCA use travessão (—) nas frases que gerar. Use ponto, vírgula, dois pontos ou reescreva a frase sem ele.
 
 REGRA ABSOLUTA: escolha SOMENTE um ${itemWord} da lista acima. Nunca invente nem sugira ${mediaWord} fora dela.
 
@@ -340,7 +354,8 @@ Responda APENAS com JSON válido, sem markdown, sem texto extra:
     const parsed = JSON.parse(text) as { tmdb_id_escolhido: unknown; porque: unknown };
 
     if (typeof parsed.tmdb_id_escolhido === 'number' && typeof parsed.porque === 'string') {
-      return { tmdb_id_escolhido: parsed.tmdb_id_escolhido, porque: parsed.porque };
+      const porque = parsed.porque.replace(/—/g, ',').replace(/–/g, ',');
+      return { tmdb_id_escolhido: parsed.tmdb_id_escolhido, porque };
     }
     return null;
   } catch {
@@ -397,6 +412,7 @@ export async function POST(req: NextRequest) {
     certification,
     mediaType    = 'movie',
     deviceId,
+    recentGenres = [],
   } = body as {
     services?: string[]; energy?: string; genre?: string; feel?: string;
     shown?: string[]; shownTmdbIds?: number[]; company?: string; endings?: string;
@@ -404,7 +420,7 @@ export async function POST(req: NextRequest) {
     favorites?: string[]; likesPick?: string[]; dislikesPick?: string[];
     loved?: string[]; disliked?: string[]; epoch?: string;
     country?: string; sortType?: string; certification?: string;
-    mediaType?: string; deviceId?: string;
+    mediaType?: string; deviceId?: string; recentGenres?: number[];
   };
 
   // --- Exige deviceId para usuários anônimos ---
@@ -479,7 +495,7 @@ export async function POST(req: NextRequest) {
     } else if (!isTV && feel) {
       // Sem gênero manual → humor define o filtro de gênero no TMDB (| = OR)
       const moodGenreIds: Record<string, string> = {
-        cansado:   '35|16',       // comédia, animação
+        cansado:   '35|10751|12|16', // comédia, família, aventura, animação
         agitado:   '18|36',       // drama, história
         entediado: '28|12|878',   // ação, aventura, ficção
         pra_baixo: '10751|35',    // família, comédia
@@ -550,7 +566,11 @@ export async function POST(req: NextRequest) {
       }));
 
       allDiscovered = [...allDiscovered, ...normalized];
+      console.log(`[recommend] pg ${page}: ${normalized.length} resultados | total: ${allDiscovered.length}`);
+    }
 
+    // Build candidates: filtrar histórico, embaralhar e pegar até 40 para diversidade
+    {
       const pool = allDiscovered.filter(
         m => !(shown as string[]).includes(m.title) && !(shown as string[]).includes(m.original_title)
       );
@@ -558,21 +578,9 @@ export async function POST(req: NextRequest) {
       const histFiltered    = historyIds.length > 0
         ? sessionFiltered.filter(m => !historyIds.includes(m.id))
         : sessionFiltered;
-
-      console.log(`[recommend] pg ${page}: ${normalized.length} resultados | histFiltered: ${histFiltered.length}`);
-
-      if (histFiltered.length >= 3) {
-        candidates = histFiltered.slice(0, 20);
-        break;
-      }
-    }
-
-    if (candidates.length === 0) {
-      const pool = allDiscovered.filter(
-        m => !(shown as string[]).includes(m.title) && !(shown as string[]).includes(m.original_title)
-      );
-      candidates = (pool.length > 0 ? pool : allDiscovered).slice(0, 20);
-      console.log(`[recommend] histórico bloqueou todos — usando ${candidates.length} candidatos sem filtro de histórico.`);
+      const candidatePool   = histFiltered.length > 0 ? histFiltered : sessionFiltered;
+      candidates = shuffleArray(candidatePool).slice(0, 40);
+      console.log(`[recommend] candidatos após shuffle: ${candidates.length}`);
     }
 
     if (candidates.length === 0) {
@@ -609,6 +617,7 @@ export async function POST(req: NextRequest) {
       const claudeChoice = await askClaude(candidates, {
         feel, company, energy, genre, endings, commitment,
         favorites, likesPick, dislikesPick, loved, disliked,
+        recentGenres: recentGenres as number[],
       }, isTV);
       if (claudeChoice && candidates.some(m => m.id === claudeChoice.tmdb_id_escolhido)) {
         pickedId     = claudeChoice.tmdb_id_escolhido;
@@ -673,6 +682,7 @@ export async function POST(req: NextRequest) {
       vote_average:     detail.vote_average ?? 0,
       vote_count:       detail.vote_count ?? 0,
       seasons:          detail.number_of_seasons ?? null,
+      genre_ids:        detail.genres?.map(g => g.id) ?? [],
       cor1, cor2,
       media_type:       'tv',
     });
@@ -698,6 +708,7 @@ export async function POST(req: NextRequest) {
       no_seu_streaming: !!matchedService,
       vote_average:     detail.vote_average ?? 0,
       vote_count:       detail.vote_count ?? 0,
+      genre_ids:        detail.genres?.map(g => g.id) ?? [],
       cor1, cor2,
       media_type:       'movie',
     });

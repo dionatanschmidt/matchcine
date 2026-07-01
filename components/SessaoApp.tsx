@@ -52,8 +52,10 @@ const initialState: AppState = {
   profileLoaded:    false,
   historicoDB:      [],
   localAvaliacoes:  [],
-  nudgeDismissed:   false,
-  limitIsLogged:    false,
+  nudgeDismissed:    false,
+  limitIsLogged:     false,
+  limitPendingEmail: null,
+  recentGenres:      [],
 };
 
 export default function SessaoApp() {
@@ -84,6 +86,7 @@ export default function SessaoApp() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
+        if (typeof window !== 'undefined') localStorage.removeItem('pendingEmail');
         handleLogin(session.user.id, session.user.email ?? null);
       }
       if (event === 'SIGNED_OUT') {
@@ -257,6 +260,7 @@ export default function SessaoApp() {
           certification: s.certification ?? undefined,
           mediaType:    s.mediaType,
           unseen:       s.unseen,
+          recentGenres: s.recentGenres,
           deviceId:     s.userId ? undefined : deviceId,
           // IDs já vistos: DB + local + session (shownIds acumula todos os filmes exibidos na sessão)
           shownTmdbIds: [...new Set([
@@ -270,10 +274,12 @@ export default function SessaoApp() {
 
       if (res.status === 429) {
         const err = await res.json().catch(() => ({} as Record<string, unknown>));
+        const pendingEmail = typeof window !== 'undefined' ? localStorage.getItem('pendingEmail') : null;
         setState(prev => ({
           ...prev,
-          view:         'limit',
-          limitIsLogged: !!(err as { isLogged?: boolean }).isLogged,
+          view:              'limit',
+          limitIsLogged:     !!(err as { isLogged?: boolean }).isLogged,
+          limitPendingEmail: pendingEmail,
         }));
         return;
       }
@@ -303,6 +309,7 @@ export default function SessaoApp() {
       current: movie!,
       shown: [...prev.shown, movie!.titulo],
       shownIds: movie!.tmdb_id ? [...new Set([...prev.shownIds, movie!.tmdb_id])] : prev.shownIds,
+      recentGenres: (movie!.genre_ids ?? []).slice(0, 3),
     }));
   };
 
@@ -411,6 +418,7 @@ export default function SessaoApp() {
           {state.view === 'limit' && (
             <LimitScreen
               isLogged={state.limitIsLogged}
+              pendingEmail={state.limitPendingEmail}
               onBack={() => update({ view: 'context' })}
             />
           )}

@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import type { AppState, Movie } from '@/lib/types';
 import { GENRE_EMOJI, MOODCOLORS, SERVICES } from '@/lib/data';
+import { addToWatchlist, isInWatchlist } from '@/lib/db';
 
 interface Props {
   state: AppState;
@@ -42,6 +43,8 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
   const [showEpochMenu, setShowEpochMenu] = useState(false);
   const [showSinopse, setShowSinopse] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [savedToWatchlist, setSavedToWatchlist] = useState(false);
+  const [watchlistToast, setWatchlistToast] = useState('');
   // Filtros locais no sheet ⚙️ — inicializados ao abrir
   const [filterGenre, setFilterGenre] = useState<string | null>(null);
   const [filterCountry, setFilterCountry] = useState<string | null>(null);
@@ -90,6 +93,45 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
       await navigator.clipboard.writeText(url).catch(() => {});
       setToastMsg('Link copiado!');
       setTimeout(() => setToastMsg(''), 2500);
+    }
+  };
+
+  // Checa watchlist ao trocar de filme
+  useEffect(() => {
+    setSavedToWatchlist(false);
+    if (!m.tmdb_id) return;
+    if (state.userId) {
+      isInWatchlist(state.userId, m.tmdb_id).then(setSavedToWatchlist).catch(() => {});
+    } else if (typeof window !== 'undefined') {
+      try {
+        const local: number[] = JSON.parse(localStorage.getItem('watchlist_anon') ?? '[]');
+        setSavedToWatchlist(local.includes(m.tmdb_id));
+      } catch {}
+    }
+  }, [m.tmdb_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSaveWatchlist = async () => {
+    if (savedToWatchlist || !m.tmdb_id) return;
+    if (state.userId) {
+      await addToWatchlist(state.userId, {
+        tmdb_id:    m.tmdb_id,
+        titulo:     m.titulo,
+        poster_path: m.poster_path ?? null,
+        ano:        m.ano ?? null,
+        generos:    m.genero ?? null,
+        streaming:  m.onde_assistir ?? null,
+      }).catch(() => {});
+      setSavedToWatchlist(true);
+    } else {
+      try {
+        const local: number[] = JSON.parse(localStorage.getItem('watchlist_anon') ?? '[]');
+        if (!local.includes(m.tmdb_id)) {
+          localStorage.setItem('watchlist_anon', JSON.stringify([...local, m.tmdb_id]));
+        }
+        setSavedToWatchlist(true);
+        setWatchlistToast('Faça cadastro para salvar sua lista em qualquer dispositivo 💾');
+        setTimeout(() => setWatchlistToast(''), 3500);
+      } catch {}
     }
   };
 
@@ -247,6 +289,34 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
           >
             ⇄ trocar
           </button>
+        </div>
+      )}
+
+      {/* Botão watchlist */}
+      {m.tmdb_id && (
+        <div style={{ marginTop: 10 }}>
+          <button
+            onClick={handleSaveWatchlist}
+            disabled={savedToWatchlist}
+            style={{
+              width: '100%',
+              background: 'none',
+              border: savedToWatchlist ? '1px solid var(--ok)' : '1px dashed var(--line)',
+              borderRadius: 10,
+              padding: '8px 16px',
+              fontSize: 13,
+              color: savedToWatchlist ? 'var(--ok)' : 'var(--muted)',
+              cursor: savedToWatchlist ? 'default' : 'pointer',
+              fontFamily: 'var(--body)',
+            }}
+          >
+            {savedToWatchlist ? '✓ Salvo' : '📌 Salvar para avaliar depois'}
+          </button>
+          {watchlistToast && (
+            <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 4 }}>
+              {watchlistToast}
+            </p>
+          )}
         </div>
       )}
 
