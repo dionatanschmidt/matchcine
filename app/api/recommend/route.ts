@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin, adminReady } from '@/lib/supabase-admin';
+import { validarPayload, inWhitelist } from '@/lib/validate-payload';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+// Whitelists dos filtros que são passados direto para a query do TMDB —
+// valores fora da lista são ignorados (nunca repassados à API externa).
+const COUNTRY_WHITELIST = ['BR', 'US', 'KR', 'EU'] as const;
+const CERTIFICATION_WHITELIST = ['L', '14'] as const;
 
 // IDs dos provedores de streaming no TMDB para o Brasil
 const PROVIDER_IDS: Record<string, number[]> = {
@@ -203,15 +209,20 @@ async function buscarCache(chave: string, shownIds: number[]): Promise<number | 
   if (!adminReady) return null;
   const seteDiasAtras = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const { data } = await supabaseAdmin
-    .from('cache_recomendacoes')
-    .select('filmes')
-    .eq('chave_contexto', chave)
-    .gte('criado_em', seteDiasAtras)
-    .maybeSingle();
+  try {
+    const { data } = await supabaseAdmin
+      .from('cache_recomendacoes')
+      .select('filmes')
+      .eq('chave_contexto', chave)
+      .gte('criado_em', seteDiasAtras)
+      .maybeSingle();
 
-  if (!Array.isArray(data?.filmes) || data.filmes.length === 0) return null;
-  return (data.filmes as number[]).find(id => !shownIds.includes(id)) ?? null;
+    if (!Array.isArray(data?.filmes) || data.filmes.length === 0) return null;
+    return (data.filmes as number[]).find(id => !shownIds.includes(id)) ?? null;
+  } catch {
+    // Supabase indisponível: segue sem cache, não bloqueia a recomendação.
+    return null;
+  }
 }
 
 // Adiciona o tmdb_id gerado ao pool de cache para este contexto.
@@ -249,11 +260,16 @@ async function verificarLimite(
   const hoje  = new Date().toISOString().slice(0, 10);
   const limite = isLogged ? 50 : 10;
 
-  const { data } = userId
-    ? await supabaseAdmin.from('uso_diario').select('contagem').eq('usuario_id', userId).eq('data', hoje).maybeSingle()
-    : await supabaseAdmin.from('uso_diario').select('contagem').eq('device_id', deviceId!).eq('data', hoje).maybeSingle();
+  try {
+    const { data } = userId
+      ? await supabaseAdmin.from('uso_diario').select('contagem').eq('usuario_id', userId).eq('data', hoje).maybeSingle()
+      : await supabaseAdmin.from('uso_diario').select('contagem').eq('device_id', deviceId!).eq('data', hoje).maybeSingle();
 
-  return { ok: (data?.contagem ?? 0) < limite, isLogged };
+    return { ok: (data?.contagem ?? 0) < limite, isLogged };
+  } catch {
+    // Supabase indisponível: não bloqueia o uso por falha de infraestrutura.
+    return { ok: true, isLogged };
+  }
 }
 
 // Incrementa a contagem apenas após geração bem-sucedida de recomendação.
@@ -377,11 +393,15 @@ export async function POST(req: NextRequest) {
     if (!adminReady) {
       return NextResponse.json({ error: 'Serviço indisponível.' }, { status: 503 });
     }
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-    if (error || !user) {
-      return NextResponse.json({ error: 'Token inválido ou expirado.' }, { status: 401 });
+    try {
+      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+      if (error || !user) {
+        return NextResponse.json({ error: 'Token inválido ou expirado.' }, { status: 401 });
+      }
+      userId = user.id;
+    } catch {
+      return NextResponse.json({ error: 'Serviço de autenticação indisponível.' }, { status: 503 });
     }
-    userId = user.id;
   }
 
   let body: Record<string, unknown>;
@@ -389,6 +409,11 @@ export async function POST(req: NextRequest) {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 });
+  }
+
+  const validacao = validarPayload(body);
+  if (!validacao.ok) {
+    return NextResponse.json({ error: validacao.error }, { status: 400 });
   }
 
   const {
@@ -518,9 +543,13 @@ export async function POST(req: NextRequest) {
     else if (epoch === '90s')   { params.set(dateGte, '1990-01-01'); params.set(dateLte, '1999-12-31'); }
     else if (epoch === 'classico') params.set(dateLte, '1989-12-31');
 
-    // Filtros adicionais do ⚙️
-    if (country) {
-      params.set('with_origin_country', country === 'EU' ? 'FR|DE|ES|IT|GB' : country);
+    // Filtros adicionais do ⚙️ — country e certification são validados contra
+    // whitelist antes de seguir para o TMDB (nunca repassa valor arbitrário).
+    const safeCountry = inWhitelist(country, COUNTRY_WHITELIST);
+    const safeCertification = inWhitelist(certification, CERTIFICATION_WHITELIST);
+
+    if (safeCountry) {
+      params.set('with_origin_country', safeCountry === 'EU' ? 'FR|DE|ES|IT|GB' : safeCountry);
     }
 
     if (sortType === 'pearl') {
@@ -529,14 +558,14 @@ export async function POST(req: NextRequest) {
       params.set('vote_count.gte', '50');
     }
 
-    if ((company === 'familia_kids' || company === 'familia_criancas') && !certification) {
+    if ((company === 'familia_kids' || company === 'familia_criancas') && !safeCertification) {
       params.set('certification_country', 'BR');
       params.set('certification.lte', '12');
     }
 
-    if (certification) {
+    if (safeCertification) {
       params.set('certification_country', 'BR');
-      params.set('certification.lte', certification);
+      params.set('certification.lte', safeCertification);
     }
 
     const discoverBase = isTV

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,10 +35,16 @@ async function fetchOmdb(query: string, omdbKey: string): Promise<{ Response: st
 }
 
 export async function GET(req: NextRequest) {
+  const ip = getClientIp(req);
+  if (!checkRateLimit(`oscar:${ip}`, 60, 10 * 60 * 1000)) {
+    return NextResponse.json({ error: 'Muitas requisições. Tente novamente em instantes.' }, { status: 429 });
+  }
+
   const { searchParams } = req.nextUrl;
-  const titulo = searchParams.get('titulo') ?? '';
-  const originalTitle = searchParams.get('original_title') ?? '';
-  const tmdbId = searchParams.get('tmdb_id') ?? '';
+  const titulo = (searchParams.get('titulo') ?? '').slice(0, 200);
+  const originalTitle = (searchParams.get('original_title') ?? '').slice(0, 200);
+  const rawTmdbId = searchParams.get('tmdb_id') ?? '';
+  const tmdbId = /^\d+$/.test(rawTmdbId) ? rawTmdbId : '';
 
   if (!titulo && !originalTitle) return NextResponse.json({ hasOscar: false });
 

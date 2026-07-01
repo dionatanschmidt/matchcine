@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 interface Item { n: string; t: string; }
+
+const MAX_ITEMS = 60;
+const MAX_NAME_LEN = 200;
+
+function isValidItem(v: unknown): v is Item {
+  return !!v && typeof v === 'object'
+    && typeof (v as Item).n === 'string' && (v as Item).n.length > 0 && (v as Item).n.length <= MAX_NAME_LEN
+    && typeof (v as Item).t === 'string';
+}
 
 async function fetchImageUrl(item: Item, apiKey: string): Promise<string | null> {
   try {
@@ -39,6 +49,11 @@ async function fetchImageUrl(item: Item, apiKey: string): Promise<string | null>
 }
 
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+  if (!checkRateLimit(`taste-images:${ip}`, 30, 10 * 60 * 1000)) {
+    return NextResponse.json({ error: 'Muitas requisições. Tente novamente em instantes.' }, { status: 429 });
+  }
+
   console.log('[taste-images] API key present:', !!process.env.TMDB_API_KEY);
   const apiKey = process.env.TMDB_API_KEY;
   if (!apiKey) {
@@ -46,11 +61,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({});
   }
 
-  const { items } = await req.json() as { items: Item[] };
+  let body: { items?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 });
+  }
+
+  const items = body.items;
   if (!Array.isArray(items) || items.length === 0) return NextResponse.json({});
+  if (items.length > MAX_ITEMS || !items.every(isValidItem)) {
+    return NextResponse.json({ error: 'Payload inválido ou excede o limite permitido.' }, { status: 400 });
+  }
 
   const entries = await Promise.all(
-    items.map(async item => {
+    (items as Item[]).map(async item => {
       const url = await fetchImageUrl(item, apiKey);
       return [item.n, url] as [string, string | null];
     })
