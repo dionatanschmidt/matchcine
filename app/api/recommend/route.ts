@@ -413,6 +413,7 @@ export async function POST(req: NextRequest) {
     mediaType    = 'movie',
     deviceId,
     recentGenres = [],
+    oscarFilter  = 'none',
   } = body as {
     services?: string[]; energy?: string; genre?: string; feel?: string;
     shown?: string[]; shownTmdbIds?: number[]; company?: string; endings?: string;
@@ -421,6 +422,7 @@ export async function POST(req: NextRequest) {
     loved?: string[]; disliked?: string[]; epoch?: string;
     country?: string; sortType?: string; certification?: string;
     mediaType?: string; deviceId?: string; recentGenres?: number[];
+    oscarFilter?: string;
   };
 
   // --- Exige deviceId para usuários anônimos ---
@@ -607,6 +609,36 @@ export async function POST(req: NextRequest) {
 
     if (candidates.length === 0) {
       return NextResponse.json({ error: 'Nenhum resultado encontrado com esses filtros.' }, { status: 404 });
+    }
+
+    // Filtro Oscar via OMDB (limitado a 10 candidatos para não estourar quota)
+    if (oscarFilter && oscarFilter !== 'none' && candidates.length > 0) {
+      const omdbKey = process.env.OMDB_API_KEY;
+      if (omdbKey) {
+        const toCheck = candidates.slice(0, 10);
+        const results = await Promise.all(
+          toCheck.map(async c => {
+            try {
+              const res = await fetch(
+                `https://www.omdbapi.com/?t=${encodeURIComponent(c.title)}&apikey=${omdbKey}`,
+                { next: { revalidate: 3600 } }
+              );
+              const data = await res.json();
+              const awards: string = data.Awards ?? '';
+              if (oscarFilter === 'winner') return /won\s+\d*\s*oscar|won\s+\d*\s*academy award/i.test(awards) ? c : null;
+              if (oscarFilter === 'nominated') return /oscar|academy award/i.test(awards) ? c : null;
+              return c;
+            } catch {
+              return c;
+            }
+          })
+        );
+        const filtered = results.filter(Boolean) as typeof candidates;
+        if (filtered.length > 0) {
+          candidates = filtered;
+          console.log(`[recommend] filtro Oscar (${oscarFilter}): ${candidates.length} candidatos`);
+        }
+      }
     }
 
     // Decide o motor baseado no perfil do usuário

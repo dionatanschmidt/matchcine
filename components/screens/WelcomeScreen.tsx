@@ -23,6 +23,22 @@ export default function WelcomeScreen({ onStart, onSkip, userId, userEmail }: Pr
     <>
       <div className="glowblob one" />
       <div className="glowblob two" />
+      {userId && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+          <button
+            onClick={() => router.push('/perfil')}
+            title="Meu perfil"
+            style={{
+              width: 36, height: 36, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid var(--line)',
+              color: 'var(--muted)', fontSize: 16,
+              cursor: 'pointer', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+            }}
+          >👤</button>
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
         <Image
           src="/logo-main.png.png"

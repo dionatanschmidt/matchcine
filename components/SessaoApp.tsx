@@ -56,6 +56,7 @@ const initialState: AppState = {
   limitIsLogged:     false,
   limitPendingEmail: null,
   recentGenres:      [],
+  oscarFilter:       null,
 };
 
 export default function SessaoApp() {
@@ -261,6 +262,7 @@ export default function SessaoApp() {
           mediaType:    s.mediaType,
           unseen:       s.unseen,
           recentGenres: s.recentGenres,
+          oscarFilter:  s.oscarFilter ?? 'none',
           deviceId:     s.userId ? undefined : deviceId,
           // IDs já vistos: DB + local + session (shownIds acumula todos os filmes exibidos na sessão)
           shownTmdbIds: [...new Set([

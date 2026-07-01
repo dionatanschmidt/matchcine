@@ -45,11 +45,14 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
   const [showSettings, setShowSettings] = useState(false);
   const [savedToWatchlist, setSavedToWatchlist] = useState(false);
   const [watchlistToast, setWatchlistToast] = useState('');
+  const [oscarData, setOscarData] = useState<{ hasOscar: boolean; awards?: string } | null>(null);
+  const [showOscarSheet, setShowOscarSheet] = useState(false);
   // Filtros locais no sheet ⚙️ — inicializados ao abrir
   const [filterGenre, setFilterGenre] = useState<string | null>(null);
   const [filterCountry, setFilterCountry] = useState<string | null>(null);
   const [filterSortType, setFilterSortType] = useState<string | null>(null);
   const [filterCert, setFilterCert] = useState<string | null>(null);
+  const [filterOscar, setFilterOscar] = useState<string | null>(null);
   const [tempServices, setTempServices] = useState<string[]>([]);
   const m = state.current!;
   const [c1, c2] = safeColors(m, state.ctx.feel);
@@ -95,6 +98,16 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
       setTimeout(() => setToastMsg(''), 2500);
     }
   };
+
+  // Busca dados Oscar ao trocar de filme
+  useEffect(() => {
+    setOscarData(null);
+    if (!m.titulo) return;
+    fetch(`/api/oscar?titulo=${encodeURIComponent(m.titulo)}`)
+      .then(r => r.json())
+      .then(setOscarData)
+      .catch(() => {});
+  }, [m.tmdb_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Checa watchlist ao trocar de filme
   useEffect(() => {
@@ -142,6 +155,7 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
       setFilterCountry(state.country ?? null);
       setFilterSortType(state.sortType ?? null);
       setFilterCert(state.certification ?? null);
+      setFilterOscar(state.oscarFilter ?? null);
     }
   }, [showSettings]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -152,6 +166,7 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
       country: filterCountry,
       sortType: filterSortType,
       certification: filterCert,
+      oscarFilter: filterOscar,
       opposite: false,
     });
   };
@@ -185,15 +200,25 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
 
       {/* Mudança 5: dropdown de época + botão Sinopse lado a lado */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, position: 'relative', gap: 8 }}>
-        {/* Botão Sinopse — pill esquerdo */}
-        {m.sinopse && (
-          <button
-            onClick={() => setShowSinopse(true)}
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--line)', borderRadius: 20, padding: '6px 14px', fontSize: 12, color: 'var(--muted)', cursor: 'pointer', fontFamily: 'var(--body)', flexShrink: 0 }}
-          >
-            Sinopse
-          </button>
-        )}
+        {/* Pills: Sinopse e Oscar */}
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+          {m.sinopse && (
+            <button
+              onClick={() => setShowSinopse(true)}
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--line)', borderRadius: 20, padding: '6px 14px', fontSize: 12, color: 'var(--muted)', cursor: 'pointer', fontFamily: 'var(--body)' }}
+            >
+              Sinopse
+            </button>
+          )}
+          {oscarData?.hasOscar && (
+            <button
+              onClick={() => setShowOscarSheet(true)}
+              style={{ background: 'rgba(255,177,60,0.12)', border: '1px solid rgba(255,177,60,0.4)', borderRadius: 20, padding: '6px 14px', fontSize: 12, color: 'var(--amber)', cursor: 'pointer', fontFamily: 'var(--body)' }}
+            >
+              🏆 Oscar
+            </button>
+          )}
+        </div>
         <div style={{ flex: 1 }} />
         <button
           onClick={() => setShowEpochMenu(v => !v)}
@@ -409,6 +434,13 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
                 <option value="14">Até 14 anos</option>
               </select>
             </FilterRow>
+            <FilterRow label="🏆 Premiação">
+              <select value={filterOscar ?? ''} onChange={e => setFilterOscar(e.target.value || null)} style={selectStyle}>
+                <option value="">Sem filtro</option>
+                <option value="nominated">Indicado ao Oscar</option>
+                <option value="winner">Vencedor do Oscar</option>
+              </select>
+            </FilterRow>
             <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={applySettings}>
               Aplicar e buscar novo
             </button>
@@ -419,13 +451,28 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
         </div>
       )}
 
-      {/* Mudança 5: sheet de sinopse */}
+      {/* Sheet de sinopse */}
       {showSinopse && (
         <div className="sheet">
           <div className="box">
             <h3><em>{m.titulo}</em></h3>
             <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--muted)', marginBottom: 16 }}>{m.sinopse}</p>
             <button className="btn btn-ghost" onClick={() => setShowSinopse(false)}>Fechar</button>
+          </div>
+        </div>
+      )}
+
+      {/* Sheet Oscar */}
+      {showOscarSheet && oscarData?.awards && (
+        <div className="sheet">
+          <div className="box">
+            <h3>🏆 Premiações</h3>
+            <ul style={{ paddingLeft: 18, margin: '0 0 16px', color: 'var(--muted)', fontSize: 14, lineHeight: 1.7 }}>
+              {oscarData.awards.split(/[.,]/).map(s => s.trim()).filter(Boolean).map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ul>
+            <button className="btn btn-ghost" onClick={() => setShowOscarSheet(false)}>Fechar</button>
           </div>
         </div>
       )}

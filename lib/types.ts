@@ -85,4 +85,5 @@ export interface AppState {
   limitIsLogged: boolean;
   limitPendingEmail: string | null;
   recentGenres: number[];
+  oscarFilter: string | null;
 }
