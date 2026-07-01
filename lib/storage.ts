@@ -39,14 +39,15 @@ export function incrementLocalDailyCount(): void {
 }
 
 export interface AnonState {
-  services:         string[];
-  likesPick:        string[];
-  favorites:        string[];
-  dislikesPick:     string[];
-  endings:          string | null;
-  localAvaliacoes:  AvaliacaoDB[];
-  watchedCount:     number;
-  nudgeDismissed:   boolean;
+  services:            string[];
+  likesPick:           string[];
+  favorites:           string[];
+  dislikesPick:        string[];
+  endings:             string | null;
+  localAvaliacoes:     AvaliacaoDB[];
+  watchedCount:        number;
+  nudgeDismissed:      boolean;
+  calibrationTmdbIds?: number[];
 }
 
 export function loadLocal(): AnonState | null {

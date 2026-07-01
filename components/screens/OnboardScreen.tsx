@@ -97,6 +97,7 @@ function getDir(dx: number, dy: number): SwipeDir {
 function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppState; onUpdate: (p: Partial<AppState>) => void; onNext: () => void; onSkipToResult: () => void }) {
   const pool = state.mediaType === 'tv' ? POOL_TV : POOL;
   const [images, setImages] = useState<Record<number, string>>({});
+  const [tmdbIds, setTmdbIds] = useState<Record<number, number>>({});
 
   useEffect(() => {
     fetch('/api/taste-images', {
@@ -105,10 +106,16 @@ function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppStat
       body: JSON.stringify({ items: pool.map(item => ({ n: item.n, t: item.t })) }),
     })
       .then(r => r.json())
-      .then((data: Record<string, string>) => {
+      .then((data: Record<string, { url: string; tmdb_id: number }>) => {
         const byIdx: Record<number, string> = {};
-        pool.forEach((item, i) => { if (data[item.n]) byIdx[i] = data[item.n]; });
+        const idsByIdx: Record<number, number> = {};
+        pool.forEach((item, i) => {
+          const entry = data[item.n];
+          if (entry?.url) byIdx[i] = entry.url;
+          if (entry?.tmdb_id != null) idsByIdx[i] = entry.tmdb_id;
+        });
         setImages(byIdx);
+        setTmdbIds(idsByIdx);
       })
       .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -139,7 +146,12 @@ function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppStat
   const rated = history.length;
   const enough = rated >= ENOUGH;
   const favs = state.favorites.length;
-  const total = pool.length;
+  // Total de itens desta rodada de calibração — NÃO usar pool.length: itens já
+  // avaliados em sessões anteriores (ex.: perfil restaurado no login) são
+  // pré-filtrados por initTasteBoard e nunca entram em board/queue/history, então
+  // pool.length ficaria maior que o realmente disponível e "Tudo avaliado!"
+  // apareceria com um denominador incorreto (ex.: "5/44" quando só 5 restavam).
+  const total = rated + (board[0] != null ? 1 : 0) + (board[1] != null ? 1 : 0) + queue.length;
 
   const frontIdx = board[0];
   const backIdx = board[1] ?? null;
@@ -160,8 +172,9 @@ function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppStat
     if (idx == null) return;
 
     const name = pool[idx].n;
+    const tmdbId = tmdbIds[idx] ?? null;
     const replacement = queue.length ? queue.shift()! : null;
-    const entry: TasteHistoryEntry = { cell: 0, idx, verdict, replacedWith: replacement ?? null };
+    const entry: TasteHistoryEntry = { cell: 0, idx, verdict, replacedWith: replacement ?? null, tmdbId };
     history.push(entry);
 
     // Promote back card to front, add replacement at back
@@ -172,14 +185,20 @@ function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppStat
     const newQueue = [...queue];
     const newHistory = [...history];
 
+    // Curti, amei/favorito e não curti significam que o usuário já conhece o
+    // título — precisa entrar em calibrationTmdbIds pra nunca ser recomendado.
+    const newCalibIds = tmdbId != null && verdict !== 'unseen'
+      ? [...state.calibrationTmdbIds, tmdbId]
+      : state.calibrationTmdbIds;
+
     if (verdict === 'like') {
-      onUpdate({ likesPick: [...state.likesPick, name], board: newBoard, tasteQueue: newQueue, tasteHistory: newHistory });
+      onUpdate({ likesPick: [...state.likesPick, name], calibrationTmdbIds: newCalibIds, board: newBoard, tasteQueue: newQueue, tasteHistory: newHistory });
     } else if (verdict === 'fav') {
-      onUpdate({ favorites: [...state.favorites, name], board: newBoard, tasteQueue: newQueue, tasteHistory: newHistory });
+      onUpdate({ favorites: [...state.favorites, name], calibrationTmdbIds: newCalibIds, board: newBoard, tasteQueue: newQueue, tasteHistory: newHistory });
     } else if (verdict === 'unseen') {
       onUpdate({ unseen: [...state.unseen, name], board: newBoard, tasteQueue: newQueue, tasteHistory: newHistory });
     } else {
-      onUpdate({ dislikesPick: [...state.dislikesPick, name], board: newBoard, tasteQueue: newQueue, tasteHistory: newHistory });
+      onUpdate({ dislikesPick: [...state.dislikesPick, name], calibrationTmdbIds: newCalibIds, board: newBoard, tasteQueue: newQueue, tasteHistory: newHistory });
     }
 
     // Trigger exit animation
@@ -193,7 +212,7 @@ function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppStat
     setDrag({ x: 0, y: 0, active: false });
 
     setTimeout(() => { setAnimState('idle'); setExitingIdx(null); }, 320);
-  }, [board, queue, history, pool, state, onUpdate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [board, queue, history, pool, state, tmdbIds, onUpdate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const trySwipe = useCallback((dx: number, dy: number, vx: number, vy: number) => {
     const dir = getDir(dx, dy);
@@ -275,14 +294,23 @@ function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppStat
     const newQueue = [...queue];
     const newHistory = [...history];
 
+    // Remove apenas uma ocorrência do tmdb_id desfeito (evita apagar um id
+    // igual vindo de outra avaliação, caso exista).
+    const removeCalibId = (ids: number[]): number[] => {
+      if (h.tmdbId == null) return ids;
+      const i = ids.indexOf(h.tmdbId);
+      if (i === -1) return ids;
+      return [...ids.slice(0, i), ...ids.slice(i + 1)];
+    };
+
     if (h.verdict === 'like') {
-      onUpdate({ likesPick: state.likesPick.filter(n => n !== name), board: newBoard, tasteQueue: newQueue, tasteHistory: newHistory });
+      onUpdate({ likesPick: state.likesPick.filter(n => n !== name), calibrationTmdbIds: removeCalibId(state.calibrationTmdbIds), board: newBoard, tasteQueue: newQueue, tasteHistory: newHistory });
     } else if (h.verdict === 'fav') {
-      onUpdate({ favorites: state.favorites.filter(n => n !== name), board: newBoard, tasteQueue: newQueue, tasteHistory: newHistory });
+      onUpdate({ favorites: state.favorites.filter(n => n !== name), calibrationTmdbIds: removeCalibId(state.calibrationTmdbIds), board: newBoard, tasteQueue: newQueue, tasteHistory: newHistory });
     } else if (h.verdict === 'unseen') {
       onUpdate({ unseen: state.unseen.filter(n => n !== name), board: newBoard, tasteQueue: newQueue, tasteHistory: newHistory });
     } else {
-      onUpdate({ dislikesPick: state.dislikesPick.filter(n => n !== name), board: newBoard, tasteQueue: newQueue, tasteHistory: newHistory });
+      onUpdate({ dislikesPick: state.dislikesPick.filter(n => n !== name), calibrationTmdbIds: removeCalibId(state.calibrationTmdbIds), board: newBoard, tasteQueue: newQueue, tasteHistory: newHistory });
     }
   };
 

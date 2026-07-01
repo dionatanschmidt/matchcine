@@ -74,10 +74,10 @@ const MOOD_COLORS: Record<string, [string, string]> = {
 // Mapa humor → gêneros preferidos para o motor de regras (sem IA)
 // Usado quando o perfil está vazio (sem favoritos nem histórico de avaliações)
 const MOOD_GENRE_MAP: Record<string, string[]> = {
-  cansado:   ['Comédia', 'Animação'],
+  cansado:   ['Comédia'],
   agitado:   ['Drama'],
   entediado: ['Ação', 'Suspense', 'Aventura'],
-  pra_baixo: ['Comédia', 'Romance', 'Animação'],
+  pra_baixo: ['Comédia', 'Romance'],
   tranquilo: [],  // qualquer gênero
   ligado:    ['Ação', 'Terror'],
 };
@@ -522,7 +522,7 @@ export async function POST(req: NextRequest) {
     } else if (!isTV && feel) {
       // Sem gênero manual → humor define o filtro de gênero no TMDB (| = OR)
       const moodGenreIds: Record<string, string> = {
-        cansado:   '35|10751|12|16', // comédia, família, aventura, animação
+        cansado:   '35|10751|12', // comédia, família, aventura
         agitado:   '18|36',       // drama, história
         entediado: '28|12|878',   // ação, aventura, ficção
         pra_baixo: '10751|35',    // família, comédia
@@ -531,6 +531,13 @@ export async function POST(req: NextRequest) {
       };
       const ids = moodGenreIds[feel];
       if (ids) params.set('with_genres', ids);
+    }
+
+    // Exclui animação/anime por padrão — dominam a métrica de popularidade do TMDB
+    // (tanto em filmes quanto, principalmente, em séries) e "vazavam" como maioria
+    // das recomendações mesmo quando o usuário não pediu esse gênero.
+    if (genre !== 'Animação') {
+      params.set('without_genres', '16');
     }
 
     const currentYear = new Date().getFullYear();
@@ -612,6 +619,7 @@ export async function POST(req: NextRequest) {
       const candidatePool   = histFiltered.length > 0 ? histFiltered : sessionFiltered;
       candidates = shuffleArray(candidatePool).slice(0, 40);
       console.log(`[recommend] candidatos após shuffle: ${candidates.length}`);
+      console.log('[recommend] generos dos candidatos:', candidates.map(c => c.genre_ids));
     }
 
     if (candidates.length === 0) {

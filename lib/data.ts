@@ -68,7 +68,7 @@ export const POOL_TV = [
   { n: 'Round 6', t: 'Série' },
   { n: 'Chernobyl', t: 'Série' },
   { n: 'Fleabag', t: 'Série' },
-  { n: 'Bem-Vindos a Bordo', t: 'Série' },
+  { n: 'Sob Nova Direção', t: 'Série' },
   { n: 'Sob Pressão', t: 'Série' },
   { n: 'O Mecanismo', t: 'Série' },
   { n: 'The Bear', t: 'Série' },
@@ -91,7 +91,7 @@ export const POOL_TV = [
   { n: 'Vince Gilligan', t: 'Showrunner' },
   { n: 'Greg Daniels', t: 'Showrunner' },
   { n: 'David Benioff', t: 'Showrunner' },
-  { n: 'Irmãos Duffer', t: 'Showrunner' },
+  { n: 'Matt Duffer', t: 'Showrunner' },
   { n: 'José Padilha', t: 'Showrunner' },
   { n: 'Glória Perez', t: 'Showrunner' },
   // Atores/Atrizes — 8

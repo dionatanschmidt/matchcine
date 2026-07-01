@@ -12,7 +12,9 @@ function isValidItem(v: unknown): v is Item {
     && typeof (v as Item).t === 'string';
 }
 
-async function fetchImageUrl(item: Item, apiKey: string): Promise<string | null> {
+interface TmdbInfo { url: string; tmdb_id: number; }
+
+async function fetchImageUrl(item: Item, apiKey: string): Promise<TmdbInfo | null> {
   try {
     if (item.t === 'Filme') {
       const res = await fetch(
@@ -20,18 +22,18 @@ async function fetchImageUrl(item: Item, apiKey: string): Promise<string | null>
         { next: { revalidate: 86400 } }
       );
       if (!res.ok) return null;
-      const data = await res.json() as { results?: { poster_path?: string | null }[] };
-      const path = data.results?.[0]?.poster_path;
-      return path ? `https://image.tmdb.org/t/p/w185${path}` : null;
+      const data = await res.json() as { results?: { id: number; poster_path?: string | null }[] };
+      const first = data.results?.[0];
+      return first?.poster_path ? { url: `https://image.tmdb.org/t/p/w185${first.poster_path}`, tmdb_id: first.id } : null;
     } else if (item.t === 'Série') {
       const res = await fetch(
         `https://api.themoviedb.org/3/search/tv?api_key=${apiKey}&language=pt-BR&query=${encodeURIComponent(item.n)}`,
         { next: { revalidate: 86400 } }
       );
       if (!res.ok) return null;
-      const data = await res.json() as { results?: { poster_path?: string | null }[] };
-      const path = data.results?.[0]?.poster_path;
-      return path ? `https://image.tmdb.org/t/p/w185${path}` : null;
+      const data = await res.json() as { results?: { id: number; poster_path?: string | null }[] };
+      const first = data.results?.[0];
+      return first?.poster_path ? { url: `https://image.tmdb.org/t/p/w185${first.poster_path}`, tmdb_id: first.id } : null;
     } else {
       // Diretor, Ator, Atriz, Showrunner
       const res = await fetch(
@@ -39,9 +41,9 @@ async function fetchImageUrl(item: Item, apiKey: string): Promise<string | null>
         { next: { revalidate: 86400 } }
       );
       if (!res.ok) return null;
-      const data = await res.json() as { results?: { profile_path?: string | null }[] };
-      const path = data.results?.[0]?.profile_path;
-      return path ? `https://image.tmdb.org/t/p/w185${path}` : null;
+      const data = await res.json() as { results?: { id: number; profile_path?: string | null }[] };
+      const first = data.results?.[0];
+      return first?.profile_path ? { url: `https://image.tmdb.org/t/p/w185${first.profile_path}`, tmdb_id: first.id } : null;
     }
   } catch {
     return null;
@@ -76,14 +78,14 @@ export async function POST(req: NextRequest) {
 
   const entries = await Promise.all(
     (items as Item[]).map(async item => {
-      const url = await fetchImageUrl(item, apiKey);
-      return [item.n, url] as [string, string | null];
+      const info = await fetchImageUrl(item, apiKey);
+      return [item.n, info] as [string, TmdbInfo | null];
     })
   );
 
-  const map: Record<string, string> = {};
-  for (const [name, url] of entries) {
-    if (url) map[name] = url;
+  const map: Record<string, TmdbInfo> = {};
+  for (const [name, info] of entries) {
+    if (info) map[name] = info;
   }
 
   console.log(`[taste-images] ${items.length} itens solicitados → ${Object.keys(map).length} imagens encontradas`);

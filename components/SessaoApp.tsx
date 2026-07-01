@@ -57,6 +57,7 @@ const initialState: AppState = {
   limitPendingEmail: null,
   recentGenres:      [],
   oscarFilter:       null,
+  calibrationTmdbIds: [],
 };
 
 export default function SessaoApp() {
@@ -102,19 +103,20 @@ export default function SessaoApp() {
   useEffect(() => {
     if (state.userId) return; // logado → Supabase cuida disso
     saveLocal({
-      services:        state.services,
-      likesPick:       state.likesPick,
-      favorites:       state.favorites,
-      dislikesPick:    state.dislikesPick,
-      endings:         state.endings,
-      localAvaliacoes: state.localAvaliacoes,
-      watchedCount:    state.watchedCount,
-      nudgeDismissed:  state.nudgeDismissed,
+      services:           state.services,
+      likesPick:          state.likesPick,
+      favorites:          state.favorites,
+      dislikesPick:       state.dislikesPick,
+      endings:            state.endings,
+      localAvaliacoes:    state.localAvaliacoes,
+      watchedCount:       state.watchedCount,
+      nudgeDismissed:     state.nudgeDismissed,
+      calibrationTmdbIds: state.calibrationTmdbIds,
     });
   }, [
     state.services, state.likesPick, state.favorites, state.dislikesPick,
     state.endings, state.localAvaliacoes, state.watchedCount,
-    state.nudgeDismissed, state.userId,
+    state.nudgeDismissed, state.calibrationTmdbIds, state.userId,
   ]);
 
   // Restaura estado anônimo do localStorage
@@ -131,6 +133,7 @@ export default function SessaoApp() {
       localAvaliacoes: local.localAvaliacoes ?? [],
       watchedCount:    local.watchedCount    ?? 0,
       nudgeDismissed:  local.nudgeDismissed  ?? false,
+      calibrationTmdbIds: local.calibrationTmdbIds ?? [],
       loved,
       disliked,
       view: hasPrefs ? 'context' : 'welcome',
@@ -138,10 +141,17 @@ export default function SessaoApp() {
     });
   };
 
-  // Carrega perfil do Supabase após login (inclusive migração pós-nudge)
+  // Carrega perfil do Supabase após login (inclusive migração pós-nudge).
+  // onAuthStateChange dispara em qualquer aba da mesma origem (Supabase propaga
+  // sessão entre abas) — se o usuário está no meio da calibração nesta aba
+  // (view === 'onboard'), não trocamos de tela nem substituímos o progresso da
+  // sessão atual: só associamos a conta e mesclamos com o perfil salvo.
   const handleLogin = async (userId: string, email?: string | null) => {
     if (stateRef.current.userId === userId) return;
-    update({ userId, userEmail: email ?? null, view: 'loading' });
+    const wasOnboarding = stateRef.current.view === 'onboard';
+    update(wasOnboarding
+      ? { userId, userEmail: email ?? null }
+      : { userId, userEmail: email ?? null, view: 'loading' });
     clearLocal(); // localStorage já migrado pelo callback; limpa de todo jeito
 
     const [profile, avaliacoes] = await Promise.all([
@@ -152,24 +162,26 @@ export default function SessaoApp() {
     const historicoDB = avaliacoes;
     const dbLoved     = historicoDB.filter(a => a.veredito === 'amei').map(a => a.titulo);
     const dbDisliked  = historicoDB.filter(a => a.veredito === 'nao_curti').map(a => a.titulo);
+    const merge = (a: string[], b: string[]) => [...new Set([...a, ...b])];
 
     if (profile) {
+      const s = stateRef.current;
       update({
         userId,
         userEmail:       email ?? null,
         profileLoaded:   true,
-        services:        profile.streamings       ?? [],
-        likesPick:       profile.ama              ?? [],
-        favorites:       profile.favoritos        ?? [],
-        dislikesPick:    profile.evita            ?? [],
-        endings:         profile.final_preferido  ?? null,
+        services:        wasOnboarding ? merge(s.services, profile.streamings ?? []) : (profile.streamings ?? []),
+        likesPick:       wasOnboarding ? merge(s.likesPick, profile.ama ?? []) : (profile.ama ?? []),
+        favorites:       wasOnboarding ? merge(s.favorites, profile.favoritos ?? []) : (profile.favoritos ?? []),
+        dislikesPick:    wasOnboarding ? merge(s.dislikesPick, profile.evita ?? []) : (profile.evita ?? []),
+        endings:         wasOnboarding ? (s.endings ?? profile.final_preferido ?? null) : (profile.final_preferido ?? null),
         historicoDB,
         loved:           dbLoved,
         disliked:        dbDisliked,
         localAvaliacoes: [],
         nudgeDismissed:  true,  // logado → nunca mostra o nudge
-        view:            'context',
-        step:            0,
+        view:            wasOnboarding ? s.view : 'context',
+        step:            wasOnboarding ? s.step : 0,
       });
     } else {
       // Novo usuário no Supabase: vai para o onboarding
@@ -180,7 +192,7 @@ export default function SessaoApp() {
         historicoDB,
         localAvaliacoes: [],
         nudgeDismissed:  true,
-        view:            'welcome',
+        view:            wasOnboarding ? stateRef.current.view : 'welcome',
       });
     }
   };
@@ -265,11 +277,13 @@ export default function SessaoApp() {
           oscarFilter:  s.oscarFilter ?? 'none',
           deviceId:     s.userId ? undefined : deviceId,
           // IDs já vistos: DB + local + session (shownIds acumula todos os filmes exibidos na sessão)
+          // + IDs avaliados na calibração (curti/amei/não curti) — o usuário já conhece esses títulos.
           shownTmdbIds: [...new Set([
             ...s.historicoDB.map(a => a.tmdb_id),
             ...s.localAvaliacoes.map(a => a.tmdb_id),
             ...(s.current?.tmdb_id !== undefined ? [s.current.tmdb_id] : []),
             ...s.shownIds,
+            ...s.calibrationTmdbIds,
           ])],
         }),
       });

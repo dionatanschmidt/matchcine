@@ -42,6 +42,7 @@ export interface TasteHistoryEntry {
   idx: number;
   verdict: 'like' | 'fav' | 'dislike' | 'unseen';
   replacedWith: number | null;
+  tmdbId: number | null;
 }
 
 export interface AppState {
@@ -86,4 +87,5 @@ export interface AppState {
   limitPendingEmail: string | null;
   recentGenres: number[];
   oscarFilter: string | null;
+  calibrationTmdbIds: number[];
 }
