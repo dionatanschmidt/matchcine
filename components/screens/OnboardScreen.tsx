@@ -413,23 +413,32 @@ function StepTaste({ state, onUpdate, onNext, onSkipToResult }: { state: AppStat
         )}
       </div>
 
-      {/* Mudança 1b: 3 botões circulares — 👎 | ⭐ (destaque) | ❤️ */}
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20, marginTop: 10 }}>
-        <button
-          onClick={() => { if (animState === 'idle' && renderFrontIdx != null) performSwipe('dislike', 'left'); }}
-          title="Não curti"
-          style={{ width: 60, height: 60, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid var(--line)', fontSize: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
-        >👎</button>
-        <button
-          onClick={() => { if (animState === 'idle' && renderFrontIdx != null) performSwipe('fav', 'up'); }}
-          title="Favorito"
-          style={{ width: 72, height: 72, borderRadius: '50%', background: '#FFB13C', border: 'none', fontSize: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, boxShadow: '0 0 16px rgba(255,177,60,0.4)', color: '#13111C' }}
-        >★</button>
-        <button
-          onClick={() => { if (animState === 'idle' && renderFrontIdx != null) performSwipe('like', 'right'); }}
-          title="Gostei"
-          style={{ width: 60, height: 60, borderRadius: '50%', background: 'rgba(255,92,154,0.15)', border: '1px solid #FF5C9A', fontSize: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
-        >❤️</button>
+      {/* Mudança 1b: 3 botões circulares — 👎 | ⭐ (destaque) | 👍 */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 20, marginTop: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <button
+            onClick={() => { if (animState === 'idle' && renderFrontIdx != null) performSwipe('dislike', 'left'); }}
+            title="Não curti"
+            style={{ width: 60, height: 60, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid var(--line)', fontSize: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+          >👎</button>
+          <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>Não curti</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <button
+            onClick={() => { if (animState === 'idle' && renderFrontIdx != null) performSwipe('fav', 'up'); }}
+            title="Favorito"
+            style={{ width: 72, height: 72, borderRadius: '50%', background: '#FFB13C', border: 'none', fontSize: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, boxShadow: '0 0 16px rgba(255,177,60,0.4)', color: '#13111C' }}
+          >★</button>
+          <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>Favorito</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <button
+            onClick={() => { if (animState === 'idle' && renderFrontIdx != null) performSwipe('like', 'right'); }}
+            title="Curti"
+            style={{ width: 60, height: 60, borderRadius: '50%', background: 'rgba(100,200,100,0.15)', border: '1px solid #4CAF50', fontSize: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+          >👍</button>
+          <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>Curti</span>
+        </div>
       </div>
 
       {/* Mudança 1c: pill "Não assisti ainda" */}

@@ -238,7 +238,7 @@ async function verificarLimite(
   if (!adminReady || (!userId && !deviceId)) return { ok: true, isLogged };
 
   const hoje  = new Date().toISOString().slice(0, 10);
-  const limite = isLogged ? 20 : 5;
+  const limite = isLogged ? 50 : 10;
 
   const { data } = userId
     ? await supabaseAdmin.from('uso_diario').select('contagem').eq('usuario_id', userId).eq('data', hoje).maybeSingle()
@@ -308,7 +308,7 @@ async function askClaude(
 MOMENTO DO USUÁRIO:
 ${feelLine}
 - Com quem vai assistir: ${ctx.company ?? '?'}
-- Tamanho do episódio: ${ctx.energy ?? '?'}
+- ${isTV ? 'Tamanho do episódio' : 'Nível de energia/fôlego'}: ${ctx.energy ?? '?'}
 - Gênero desejado agora: ${ctx.genre ?? 'sem preferência'}
 ${prefsLine}
 - Títulos/nomes que ama (⭐ peso 5): ${ctx.favorites?.join(', ') || '—'}
@@ -468,12 +468,26 @@ export async function POST(req: NextRequest) {
       // 'qualquer' → sem filtro de runtime
       if (commitment === 'mini') params.set('with_type', '2');
     } else {
-      if (energy === 'baixo') params.set('with_runtime.lte', '100');
+      if (energy === 'baixo') params.set('with_runtime.lte', '90');
+      else if (energy === 'medio') { params.set('with_runtime.gte', '90'); params.set('with_runtime.lte', '150'); }
+      // 'alto' → sem filtro de runtime
     }
 
     if (genre) {
       const genreId = isTV ? TV_GENRE_IDS[genre] : GENRE_IDS[genre];
       if (genreId) params.set('with_genres', String(genreId));
+    } else if (!isTV && feel) {
+      // Sem gênero manual → humor define o filtro de gênero no TMDB (| = OR)
+      const moodGenreIds: Record<string, string> = {
+        cansado:   '35|16',       // comédia, animação
+        agitado:   '18|36',       // drama, história
+        entediado: '28|12|878',   // ação, aventura, ficção
+        pra_baixo: '10751|35',    // família, comédia
+        tranquilo: '',
+        ligado:    '27|53',       // terror, suspense
+      };
+      const ids = moodGenreIds[feel];
+      if (ids) params.set('with_genres', ids);
     }
 
     const currentYear = new Date().getFullYear();
@@ -497,6 +511,11 @@ export async function POST(req: NextRequest) {
       params.set('vote_count.gte', '50');
     }
 
+    if ((company === 'familia_kids' || company === 'familia_criancas') && !certification) {
+      params.set('certification_country', 'BR');
+      params.set('certification.lte', '12');
+    }
+
     if (certification) {
       params.set('certification_country', 'BR');
       params.set('certification.lte', certification);
@@ -505,6 +524,8 @@ export async function POST(req: NextRequest) {
     const discoverBase = isTV
       ? 'https://api.themoviedb.org/3/discover/tv'
       : 'https://api.themoviedb.org/3/discover/movie';
+
+    console.log('[recommend] TMDB params:', Object.fromEntries(params.entries()));
 
     const startPage = Math.floor(Math.random() * 3) + 1;
     const pageOrder = [startPage, ...[1, 2, 3].filter(p => p !== startPage)];
