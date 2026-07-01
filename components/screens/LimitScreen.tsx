@@ -70,7 +70,7 @@ export default function LimitScreen({ isLogged, pendingEmail, onBack }: Props) {
           <p className="sub" style={{ margin: 0 }}>
             Cadastre seu e-mail para ter 50 por dia
           </p>
-          <div style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 320, marginTop: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%', maxWidth: 320, marginTop: 8 }}>
             <input
               type="email"
               inputMode="email"
@@ -80,12 +80,13 @@ export default function LimitScreen({ isLogged, pendingEmail, onBack }: Props) {
               onChange={e => setEmail(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
               className="nudge-input"
-              style={{ flex: 1 }}
+              style={{ flex: 1, padding: '16px', fontSize: 16, borderRadius: 14 }}
             />
             <button
               className="nudge-send"
               onClick={handleSend}
               disabled={loading || !email.trim()}
+              style={{ width: 48, height: 48, borderRadius: 12, flexShrink: 0, padding: 0, fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
               {loading ? '…' : '→'}
             </button>

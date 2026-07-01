@@ -7,16 +7,41 @@ interface OscarResult {
   awards?: string;
 }
 
-// Cache em memória: título → resultado com TTL de 1h
 const cache = new Map<string, { result: OscarResult; expiresAt: number }>();
-const TTL = 60 * 60 * 1000; // 1 hora
+const TTL = 60 * 60 * 1000;
+
+function traduzir(awards: string): string {
+  return awards
+    .replace(/Won (\d+) Oscar[s]?/gi, 'Venceu $1 Oscar')
+    .replace(/Nominated for (\d+) Oscar[s]?/gi, 'Indicado para $1 Oscar')
+    .replace(/(\d+) win[s]?/gi, '$1 vitória(s)')
+    .replace(/(\d+) nomination[s]?/gi, '$1 indicação(ões)')
+    .replace(/& /g, 'e ')
+    .replace(/\btotal\b/gi, 'no total')
+    .replace(/\banother\b/gi, 'outra(s)')
+    .replace(/\bwin\b/gi, 'vitória')
+    .replace(/\bnomination\b/gi, 'indicação');
+}
+
+async function fetchOmdb(query: string, omdbKey: string): Promise<{ Response: string; Awards?: string } | null> {
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?${query}&apikey=${omdbKey}`, { next: { revalidate: 3600 } });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const titulo = searchParams.get('titulo') ?? '';
-  if (!titulo) return NextResponse.json({ hasOscar: false });
+  const originalTitle = searchParams.get('original_title') ?? '';
+  const tmdbId = searchParams.get('tmdb_id') ?? '';
 
-  const key = titulo.toLowerCase().trim();
+  if (!titulo && !originalTitle) return NextResponse.json({ hasOscar: false });
+
+  const key = `${titulo}|${originalTitle}`.toLowerCase().trim();
 
   const cached = cache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
@@ -27,15 +52,65 @@ export async function GET(req: NextRequest) {
   if (!omdbKey) return NextResponse.json({ hasOscar: false });
 
   try {
-    const url = `https://www.omdbapi.com/?t=${encodeURIComponent(titulo)}&apikey=${omdbKey}`;
-    const res = await fetch(url, { next: { revalidate: 3600 } });
-    if (!res.ok) return NextResponse.json({ hasOscar: false });
+    let data: { Response: string; Awards?: string; imdbID?: string } | null = null;
+    let usedTitle = '';
 
-    const data = await res.json();
+    // 1. Tenta pelo título em português
+    if (titulo) {
+      data = await fetchOmdb(`t=${encodeURIComponent(titulo)}`, omdbKey);
+      if (data?.Response === 'True') {
+        usedTitle = titulo;
+      } else {
+        data = null;
+      }
+    }
+
+    // 2. Tenta pelo título original em inglês
+    if (!data && originalTitle && originalTitle !== titulo) {
+      data = await fetchOmdb(`t=${encodeURIComponent(originalTitle)}`, omdbKey);
+      if (data?.Response === 'True') {
+        usedTitle = originalTitle;
+      } else {
+        data = null;
+      }
+    }
+
+    // 3. Tenta pelo imdb_id via TMDB (se tmdb_id disponível)
+    if (!data && tmdbId) {
+      const tmdbKey = process.env.TMDB_API_KEY;
+      if (tmdbKey) {
+        const tmdbRes = await fetch(
+          `https://api.themoviedb.org/3/movie/${tmdbId}/external_ids?api_key=${tmdbKey}`,
+          { next: { revalidate: 3600 } }
+        );
+        if (tmdbRes.ok) {
+          const tmdbData = await tmdbRes.json();
+          const imdbId: string = tmdbData.imdb_id ?? '';
+          if (imdbId) {
+            data = await fetchOmdb(`i=${imdbId}`, omdbKey);
+            if (data?.Response === 'True') {
+              usedTitle = `imdb:${imdbId}`;
+            } else {
+              data = null;
+            }
+          }
+        }
+      }
+    }
+
+    if (!data) {
+      const result: OscarResult = { hasOscar: false };
+      cache.set(key, { result, expiresAt: Date.now() + TTL });
+      return NextResponse.json(result);
+    }
+
+    console.log(`[oscar] encontrado via: "${usedTitle}"`);
+
     const awards: string = data.Awards ?? '';
-
     const hasOscar = awards !== 'N/A' && /oscar|academy award/i.test(awards);
-    const result: OscarResult = hasOscar ? { hasOscar: true, awards } : { hasOscar: false };
+    const result: OscarResult = hasOscar
+      ? { hasOscar: true, awards: traduzir(awards) }
+      : { hasOscar: false };
 
     cache.set(key, { result, expiresAt: Date.now() + TTL });
     return NextResponse.json(result);

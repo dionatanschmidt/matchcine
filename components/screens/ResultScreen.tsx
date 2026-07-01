@@ -103,7 +103,10 @@ export default function ResultScreen({ state, onUpdate, onRecommend, onAvaliacao
   useEffect(() => {
     setOscarData(null);
     if (!m.titulo) return;
-    fetch(`/api/oscar?titulo=${encodeURIComponent(m.titulo)}`)
+    const oscarParams = new URLSearchParams({ titulo: m.titulo });
+    if (m.titulo_original) oscarParams.set('original_title', m.titulo_original);
+    if (m.tmdb_id) oscarParams.set('tmdb_id', String(m.tmdb_id));
+    fetch(`/api/oscar?${oscarParams}`)
       .then(r => r.json())
       .then(setOscarData)
       .catch(() => {});

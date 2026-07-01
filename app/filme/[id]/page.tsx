@@ -87,13 +87,13 @@ export default async function VitrinePage({ params, searchParams }: PageProps) {
   const streamingUrl = firstProvider ? (STREAMING_LINKS[firstProvider.provider_name] ?? null) : null;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#13111C', color: '#F6F1EA', fontFamily: 'system-ui, sans-serif', padding: '32px 20px' }}>
+    <div style={{ minHeight: '100vh', background: '#13111C', color: '#F6F1EA', fontFamily: 'system-ui, sans-serif', padding: '16px 20px 32px' }}>
+      {/* Header com logo pequena no canto esquerdo */}
+      <div style={{ display: 'flex', alignItems: 'center', padding: '0 0 16px', gap: 8 }}>
+        <Image src="/logo-main.png.png" alt="MatchCine" height={36} width={108} style={{ objectFit: 'contain', height: 36, width: 'auto' }} priority />
+        <span style={{ fontSize: 14, color: 'var(--muted, #A79BB8)' }}>MatchCine</span>
+      </div>
       <div style={{ maxWidth: 400, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-
-        {/* Logo */}
-        <div style={{ marginBottom: 24 }}>
-          <Image src="/logo-main.png.png" alt="MatchCine" height={60} width={180} style={{ objectFit: 'contain' }} priority />
-        </div>
 
         {/* Poster */}
         <div style={{ position: 'relative', width: '100%', maxWidth: 280, marginBottom: 20 }}>

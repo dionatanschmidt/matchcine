@@ -39,13 +39,13 @@ export default function WelcomeScreen({ onStart, onSkip, userId, userEmail }: Pr
           >👤</button>
         </div>
       )}
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8, marginBottom: 12 }}>
         <Image
           src="/logo-main.png.png"
           alt="MatchCine"
-          height={180}
-          width={360}
-          style={{ objectFit: 'contain', height: 180, width: 'auto', maxWidth: 240 }}
+          height={120}
+          width={240}
+          style={{ objectFit: 'contain', height: 120, width: 'auto', maxWidth: 180 }}
           priority
         />
       </div>

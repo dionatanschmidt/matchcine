@@ -62,7 +62,25 @@ export default function EntrarPage() {
       options: { shouldCreateUser: true },
     });
     setLoading(false);
-    if (err) { setError('Não foi possível enviar o código. Tente novamente.'); return; }
+    if (err) {
+      console.error('[OTP] Erro ao enviar código:', err);
+      // Nota: no Supabase free tier sem SMTP customizado configurado em
+      // Authentication > Settings > Email, o envio de e-mail é severamente
+      // limitado. Configure um SMTP (ex: Resend, SendGrid) no Dashboard do Supabase.
+      const msg = err.message ?? '';
+      if (/rate limit|too many/i.test(msg)) {
+        setError('Muitas tentativas. Aguarde alguns minutos e tente novamente.');
+      } else if (/not confirmed/i.test(msg)) {
+        setError('Verifique seu e-mail — já enviamos um código antes.');
+      } else {
+        setError(
+          process.env.NODE_ENV === 'development'
+            ? `Erro: ${msg}`
+            : 'Não foi possível enviar o código. Verifique o e-mail e tente novamente.'
+        );
+      }
+      return;
+    }
     setStep('otp');
   };
 
